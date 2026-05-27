@@ -1,0 +1,10 @@
+spring:
+  application:
+    name: SecureSign
+
+server:
+  port: 8080
+
+logging:
+  level:
+    es.faustino.securesign: DEBUG
