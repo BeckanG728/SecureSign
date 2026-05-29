@@ -1,6 +1,6 @@
 package es.faustino.securesign.model;
 
-public record CertificateRequest(
+public record DocumentRequest(
         String nombre,
         String dni,
         String tipo,
