@@ -8,3 +8,6 @@ server:
 logging:
   level:
     es.faustino.securesign: DEBUG
+
+securesign:
+  keystore-password: ${SECURESIGN_KEYSTORE_PASSWORD:securesign-dev-password}

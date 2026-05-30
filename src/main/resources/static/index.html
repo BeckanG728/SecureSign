@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>SecureSign — Firma y Validación Criptográfica</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com"/>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500&display=swap"
+          rel="stylesheet"/>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+          --bg:       #080910;
+          --surface:  #0f1018;
+          --surface2: #13151f;
+          --border:   #1e2030;
+          --border2:  #2a2d40;
+          --text:     #d8dae8;
+          --subtle:   #525470;
+          --muted:    #373955;
+          --accent:   #c8f060;
+          --accent2:  #60d4f0;
+          --success:  #60f0a8;
+          --danger:   #f06070;
+          --warn:     #f0c060;
+          --mono:     'IBM Plex Mono', monospace;
+        }
+        html { scroll-behavior: smooth; }
+        body {
+          background: var(--bg);
+          color: var(--text);
+          font-family: var(--mono);
+          font-size: 13px;
+          line-height: 1.6;
+          min-height: 100vh;
+          overflow-x: hidden;
+        }
+        body::before {
+          content: '';
+          position: fixed;
+          inset: 0;
+          background-image:
+            linear-gradient(rgba(200,240,96,.018) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(200,240,96,.018) 1px, transparent 1px);
+          background-size: 40px 40px;
+          pointer-events: none;
+          z-index: 0;
+        }
+        /* Header */
+        header {
+          position: relative; z-index: 10;
+          border-bottom: 1px solid var(--border);
+          padding: 0 2.5rem;
+          display: flex; align-items: center; justify-content: space-between;
+          height: 56px;
+          background: rgba(8,9,16,.92);
+          backdrop-filter: blur(12px);
+        }
+        .header-left { display: flex; align-items: center; gap: 1rem; }
+        .logo-mark {
+          width: 28px; height: 28px;
+          border: 1.5px solid var(--accent);
+          display: flex; align-items: center; justify-content: center;
+          font-size: 11px; font-weight: 600; color: var(--accent);
+          position: relative;
+        }
+        .logo-mark::after {
+          content: ''; position: absolute; inset: 3px;
+          background: var(--accent); opacity: .12;
+        }
+        .logo-text { font-size: 13px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; }
+        .logo-text span { color: var(--accent); }
+        .header-tags { display: flex; gap: .5rem; }
+        .tag {
+          font-size: 10px; letter-spacing: .08em; padding: 2px 7px;
+          border: 1px solid var(--border2); color: var(--subtle); text-transform: uppercase;
+        }
+        .tag.active { border-color: var(--accent); color: var(--accent); }
+        /* Main */
+        main {
+          position: relative; z-index: 1;
+          display: grid; grid-template-columns: 1fr 1fr;
+          gap: 1.5px;
+          max-width: 1280px; margin: 0 auto;
+          padding: 2rem 2rem 4rem;
+        }
+        /* Panels */
+        .panel {
+          background: var(--surface);
+          border: 1px solid var(--border);
+          padding: 2rem;
+          position: relative; overflow: hidden;
+          animation: panelIn .5s ease both;
+        }
+        .panel:first-child { animation-delay: .05s; }
+        .panel:last-child  { animation-delay: .15s; }
+        @keyframes panelIn {
+          from { opacity: 0; transform: translateY(12px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        .panel-emit::before {
+          content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+          background: linear-gradient(90deg, var(--accent), transparent 60%);
+        }
+        .panel-verify::before {
+          content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+          background: linear-gradient(90deg, var(--accent2), transparent 60%);
+        }
+        .panel::after {
+          content: ''; position: absolute; bottom: 0; right: 0;
+          width: 40px; height: 40px;
+          border-top: 1px solid var(--border2); border-left: 1px solid var(--border2);
+        }
+        /* Panel head */
+        .panel-head { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 1.8rem; }
+        .panel-num  { font-size: 10px; color: var(--subtle); letter-spacing: .1em; margin-bottom: .25rem; }
+        .panel-title { font-size: 15px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+        .panel-emit .panel-title   { color: var(--accent); }
+        .panel-verify .panel-title { color: var(--accent2); }
+        .panel-icon { width: 36px; height: 36px; border: 1px solid var(--border2); display: flex; align-items: center; justify-content: center; font-size: 16px; opacity: .7; }
+        /* Algo selector */
+        .algo-group { display: flex; gap: .5rem; margin-bottom: 1.4rem; }
+        .algo-btn {
+          flex: 1; padding: .55rem 1rem;
+          background: transparent; border: 1px solid var(--border2);
+          color: var(--subtle); font-family: var(--mono); font-size: 12px;
+          font-weight: 500; letter-spacing: .07em; cursor: pointer;
+          transition: all .18s ease; text-transform: uppercase;
+          position: relative; overflow: hidden;
+        }
+        .algo-btn::before { content: ''; position: absolute; inset: 0; opacity: 0; transition: opacity .18s ease; }
+        .panel-emit   .algo-btn::before { background: var(--accent); }
+        .panel-verify .algo-btn::before { background: var(--accent2); }
+        .algo-btn.active { color: var(--bg); border-color: transparent; font-weight: 600; }
+        .algo-btn.active::before { opacity: 1; }
+        .algo-btn span, .algo-btn.active span { position: relative; z-index: 1; }
+        /* Fields */
+        .field { margin-bottom: 1rem; }
+        .field label { display: block; font-size: 10px; letter-spacing: .1em; color: var(--subtle); text-transform: uppercase; margin-bottom: .35rem; }
+        .field input, .field select {
+          width: 100%; background: var(--surface2); border: 1px solid var(--border2);
+          color: var(--text); font-family: var(--mono); font-size: 13px;
+          padding: .6rem .75rem; outline: none; transition: border-color .15s ease; appearance: none;
+        }
+        .field input:focus, .field select:focus { border-color: var(--accent); }
+        .panel-verify .field input:focus, .panel-verify .field select:focus { border-color: var(--accent2); }
+        .field input::placeholder { color: var(--muted); }
+        .field select {
+          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23525470'/%3E%3C/svg%3E");
+          background-repeat: no-repeat; background-position: right .75rem center; cursor: pointer;
+        }
+        .fields-row { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+        /* Buttons */
+        .btn-primary {
+          width: 100%; padding: .75rem 1.5rem;
+          background: var(--accent); border: none; color: var(--bg);
+          font-family: var(--mono); font-size: 12px; font-weight: 600;
+          letter-spacing: .1em; text-transform: uppercase; cursor: pointer;
+          transition: all .18s ease; margin-top: 1.2rem; position: relative; overflow: hidden;
+        }
+        .btn-primary::after { content: ''; position: absolute; inset: 0; background: white; opacity: 0; transition: opacity .15s ease; }
+        .btn-primary:hover::after { opacity: .08; }
+        .btn-primary:active { transform: scale(.99); }
+        .btn-primary:disabled { opacity: .4; cursor: not-allowed; }
+        .panel-verify .btn-primary { background: var(--accent2); }
+        .btn-secondary {
+          width: 100%; padding: .65rem 1.5rem;
+          background: transparent; border: 1px solid var(--border2);
+          color: var(--subtle); font-family: var(--mono); font-size: 12px;
+          font-weight: 500; letter-spacing: .1em; text-transform: uppercase;
+          cursor: pointer; transition: all .18s ease; margin-top: .5rem;
+        }
+        .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+        /* Spinner */
+        .spinner {
+          display: inline-block; width: 10px; height: 10px;
+          border: 1.5px solid transparent; border-top-color: currentColor;
+          border-radius: 50%; animation: spin .6s linear infinite;
+          margin-right: .5rem; vertical-align: middle;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        /* Emit result */
+        .emit-result {
+          margin-top: 1.2rem; border: 1px solid var(--border2);
+          background: var(--surface2); padding: 1rem; display: none; animation: fadeIn .3s ease;
+        }
+        .emit-result.show { display: block; }
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(4px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        .result-row {
+          display: flex; justify-content: space-between; align-items: center;
+          padding: .3rem 0; border-bottom: 1px solid var(--border); font-size: 12px;
+        }
+        .result-row:last-child { border-bottom: none; }
+        .result-row .key   { color: var(--subtle); }
+        .result-row .value { color: var(--accent); font-weight: 500; word-break: break-all; text-align: right; max-width: 70%; }
+        /* Drop zone */
+        .dropzone {
+          border: 1px dashed var(--border2); background: var(--surface2);
+          padding: 2rem 1rem; text-align: center; cursor: pointer;
+          transition: all .18s ease; position: relative; margin-bottom: 1rem;
+        }
+        .dropzone:hover, .dropzone.dragover { border-color: var(--accent2); background: rgba(96,212,240,.04); }
+        .dropzone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
+        .dz-icon  { font-size: 24px; margin-bottom: .5rem; opacity: .5; }
+        .dz-text  { font-size: 11px; color: var(--subtle); letter-spacing: .06em; }
+        .dz-file  { font-size: 12px; color: var(--accent2); margin-top: .4rem; display: none; }
+        /* Verify result */
+        .verify-result {
+          margin-top: 1.2rem; padding: 1rem 1.2rem; border-left: 3px solid transparent;
+          display: none; animation: fadeIn .3s ease; font-size: 12px;
+        }
+        .verify-result.show    { display: block; }
+        .verify-result.success { border-color: var(--success); background: rgba(96,240,168,.06); }
+        .verify-result.error   { border-color: var(--danger);  background: rgba(240,96,112,.06); }
+        .verify-result.warning { border-color: var(--warn);    background: rgba(240,192,96,.06); }
+        .verify-result .status { font-size: 13px; font-weight: 600; letter-spacing: .06em; margin-bottom: .4rem; }
+        .verify-result.success .status { color: var(--success); }
+        .verify-result.error   .status { color: var(--danger);  }
+        .verify-result.warning .status { color: var(--warn);    }
+        .verify-result .detail { color: var(--subtle); }
+        /* Footer */
+        footer {
+          position: relative; z-index: 1;
+          border-top: 1px solid var(--border);
+          padding: 1rem 2.5rem;
+          display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+        }
+        .footer-tags { display: flex; gap: .5rem; flex-wrap: wrap; }
+        .ftag { font-size: 10px; letter-spacing: .07em; color: var(--subtle); padding: 2px 6px; border: 1px solid var(--border); text-transform: uppercase; }
+        .footer-note { font-size: 10px; color: var(--muted); letter-spacing: .05em; }
+        /* Responsive */
+        @media (max-width: 820px) {
+          main { grid-template-columns: 1fr; padding: 1rem; }
+          header { padding: 0 1rem; }
+          footer { padding: .75rem 1rem; flex-direction: column; align-items: flex-start; }
+          .header-tags { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="header-left">
+        <div class="logo-mark"><span>SS</span></div>
+        <span class="logo-text">Secure<span>Sign</span></span>
+    </div>
+    <div class="header-tags">
+        <span class="tag active">ECDSA P-256</span>
+        <span class="tag active">Ed25519</span>
+        <span class="tag">PKCS12</span>
+        <span class="tag">RFC 7292</span>
+    </div>
+</header>
+
+<main>
+
+    <!-- Panel 01 — Emisión -->
+    <div class="panel panel-emit">
+        <div class="panel-head">
+            <div>
+                <div class="panel-num">// PANEL 01</div>
+                <div class="panel-title">Emitir Certificado</div>
+            </div>
+            <div class="panel-icon">⬡</div>
+        </div>
+
+        <div class="algo-group">
+            <button class="algo-btn active" id="btn-ecdsa-emit" onclick="selectAlgo('emit','ECDSA')"><span>ECDSA</span>
+            </button>
+            <button class="algo-btn" id="btn-ed25519-emit" onclick="selectAlgo('emit','Ed25519')"><span>Ed25519</span>
+            </button>
+        </div>
+
+        <div class="fields-row">
+            <div class="field">
+                <label>Nombre completo</label>
+                <input type="text" id="inp-nombre" placeholder="Ana García López"/>
+            </div>
+            <div class="field">
+                <label>DNI</label>
+                <input type="text" id="inp-dni" placeholder="12345678" maxlength="12"/>
+            </div>
+        </div>
+
+        <div class="fields-row">
+            <div class="field">
+                <label>Tipo de certificado</label>
+                <select id="inp-tipo">
+                    <option value="">— Seleccionar —</option>
+                    <option value="Constancia Academica">Constancia Académica</option>
+                    <option value="Antecedentes Penales">Antecedentes Penales</option>
+                    <option value="Certificado Laboral">Certificado Laboral</option>
+                    <option value="Certificado de Residencia">Certificado de Residencia</option>
+                </select>
+            </div>
+            <div class="field">
+                <label>Fecha de emisión</label>
+                <input type="date" id="inp-fecha"/>
+            </div>
+        </div>
+
+        <button class="btn-primary" id="btn-emit" onclick="emitirCertificado()">
+            <span id="emit-btn-text">Emitir certificado</span>
+        </button>
+
+        <div class="emit-result" id="emit-result">
+            <div class="result-row">
+                <span class="key">KEY ID</span>
+                <span class="value" id="res-keyid">—</span>
+            </div>
+            <div class="result-row">
+                <span class="key">ALGORITMO</span>
+                <span class="value" id="res-algo">—</span>
+            </div>
+            <div class="result-row">
+                <span class="key">TAMAÑO PDF</span>
+                <span class="value" id="res-sigsize">—</span>
+            </div>
+            <button class="btn-secondary" onclick="descargarPDF()" style="margin-top:.8rem;">
+                ↓ Descargar PDF firmado
+            </button>
+        </div>
+    </div>
+
+    <!-- Panel 02 — Verificación -->
+    <div class="panel panel-verify">
+        <div class="panel-head">
+            <div>
+                <div class="panel-num">// PANEL 02</div>
+                <div class="panel-title">Verificar Firma</div>
+            </div>
+            <div class="panel-icon">◈</div>
+        </div>
+
+        <div class="algo-group">
+            <button class="algo-btn active" id="btn-ecdsa-verify" onclick="selectAlgo('verify','ECDSA')">
+                <span>ECDSA</span></button>
+            <button class="algo-btn" id="btn-ed25519-verify" onclick="selectAlgo('verify','Ed25519')">
+                <span>Ed25519</span></button>
+        </div>
+
+        <div class="field">
+            <label>Key ID</label>
+            <input type="text" id="ver-keyid" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"/>
+        </div>
+
+        <div class="dropzone" id="dropzone">
+            <input type="file" id="ver-file" accept="application/pdf" onchange="onFileSelected(event)"/>
+            <div class="dz-icon">⬡</div>
+            <div class="dz-text">ARRASTRAR PDF AQUÍ<br/>o clic para seleccionar</div>
+            <div class="dz-file" id="dz-filename"></div>
+        </div>
+
+        <button class="btn-primary" id="btn-verify" onclick="verificarCertificado()">
+            <span id="verify-btn-text">Verificar integridad</span>
+        </button>
+
+        <div class="verify-result" id="verify-result">
+            <div class="status" id="ver-status">—</div>
+            <div class="detail" id="ver-detail">—</div>
+        </div>
+    </div>
+
+</main>
+
+<footer>
+    <div class="footer-tags">
+        <span class="ftag">Java 17</span>
+        <span class="ftag">Spring Boot</span>
+        <span class="ftag">PDFBox 3.0</span>
+        <span class="ftag">SHA-256</span>
+        <span class="ftag">AES-256</span>
+    </div>
+    <span class="footer-note">Sistema educativo · Infraestructura criptográfica · No repudio documental</span>
+</footer>
+
+<script>
+    const API = 'http://localhost:8080';
+    const state = { emit: { algo: 'ECDSA' }, verify: { algo: 'ECDSA' }, lastEmission: null };
+
+    window.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('inp-fecha').value = new Date().toISOString().split('T')[0];
+      const dz = document.getElementById('dropzone');
+      dz.addEventListener('dragover',  e => { e.preventDefault(); dz.classList.add('dragover'); });
+      dz.addEventListener('dragleave', ()  => dz.classList.remove('dragover'));
+      dz.addEventListener('drop', e => {
+        e.preventDefault(); dz.classList.remove('dragover');
+        const file = e.dataTransfer.files[0];
+        if (file?.type === 'application/pdf') {
+          const dt = new DataTransfer(); dt.items.add(file);
+          document.getElementById('ver-file').files = dt.files;
+          showFileName(file.name);
+        }
+      });
+    });
+
+    function selectAlgo(panel, algo) {
+      state[panel].algo = algo;
+      const pfx = panel === 'emit' ? 'emit' : 'verify';
+      document.getElementById(`btn-ecdsa-${pfx}`).classList.toggle('active',   algo === 'ECDSA');
+      document.getElementById(`btn-ed25519-${pfx}`).classList.toggle('active', algo === 'Ed25519');
+    }
+
+    async function emitirCertificado() {
+      const nombre = document.getElementById('inp-nombre').value.trim();
+      const dni    = document.getElementById('inp-dni').value.trim();
+      const tipo   = document.getElementById('inp-tipo').value;
+      const fecha  = document.getElementById('inp-fecha').value;
+      if (!nombre || !dni || !tipo || !fecha) { showWarning('Completa todos los campos antes de emitir.'); return; }
+      setLoading('emit', true);
+      document.getElementById('emit-result').classList.remove('show');
+      try {
+        const res = await fetch(`${API}/api/certificates/generate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nombre, dni, tipo, fecha, algorithm: state.emit.algo }),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const keyId     = res.headers.get('X-Key-Id');
+        const algorithm = res.headers.get('X-Algorithm') || state.emit.algo;
+        const pdfBlob   = await res.blob();
+        state.lastEmission = { keyId, algorithm, pdfBlob, nombre };
+        document.getElementById('res-keyid').textContent  = keyId;
+        document.getElementById('res-algo').textContent   = algorithm;
+        document.getElementById('res-sigsize').textContent = formatSize(pdfBlob.size);
+        document.getElementById('emit-result').classList.add('show');
+        document.getElementById('ver-keyid').value = keyId;
+        selectAlgo('verify', algorithm);
+      } catch (err) {
+        showWarning(`Error al emitir: ${err.message}`);
+      } finally {
+        setLoading('emit', false);
+      }
+    }
+
+    function descargarPDF() {
+      if (!state.lastEmission) return;
+      const url = URL.createObjectURL(state.lastEmission.pdfBlob);
+      const a = Object.assign(document.createElement('a'), {
+        href: url,
+        download: `certificado_${state.lastEmission.nombre.replace(/\s+/g,'_').toLowerCase()}.pdf`,
+      });
+      a.click(); URL.revokeObjectURL(url);
+    }
+
+    async function verificarCertificado() {
+      const keyId = document.getElementById('ver-keyid').value.trim();
+      const file  = document.getElementById('ver-file').files[0];
+      if (!keyId) { showWarning('Introduce el Key ID del certificado.'); return; }
+      if (!file)  { showWarning('Selecciona el archivo PDF a verificar.'); return; }
+      setLoading('verify', true);
+      document.getElementById('verify-result').classList.remove('show');
+      try {
+        const formData = new FormData();
+        formData.append('keyId', keyId);
+        formData.append('algorithm', state.verify.algo);
+        formData.append('file', file);
+        const res  = await fetch(`${API}/api/certificates/verify`, { method: 'POST', body: formData });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        const el = document.getElementById('verify-result');
+        document.getElementById('ver-status').textContent = data.valid ? '✓ FIRMA VÁLIDA' : '✗ FIRMA INVÁLIDA';
+        document.getElementById('ver-detail').textContent = data.valid
+          ? 'El documento es auténtico e íntegro. No fue modificado desde su emisión.'
+          : 'El documento fue alterado o los datos no coinciden con la clave registrada.';
+        el.className = `verify-result show ${data.valid ? 'success' : 'error'}`;
+      } catch (err) {
+        showWarning(`Error de conexión: ${err.message}`);
+      } finally {
+        setLoading('verify', false);
+      }
+    }
+
+    function setLoading(panel, loading) {
+      if (panel === 'emit') {
+        document.getElementById('btn-emit').disabled = loading;
+        document.getElementById('emit-btn-text').innerHTML = loading
+          ? '<span class="spinner"></span>Firmando documento...' : 'Emitir certificado';
+      } else {
+        document.getElementById('btn-verify').disabled = loading;
+        document.getElementById('verify-btn-text').innerHTML = loading
+          ? '<span class="spinner"></span>Verificando...' : 'Verificar integridad';
+      }
+    }
+
+    function showWarning(msg) {
+      const el = document.getElementById('verify-result');
+      document.getElementById('ver-status').textContent = '⚠ ATENCIÓN';
+      document.getElementById('ver-detail').textContent = msg;
+      el.className = 'verify-result show warning';
+      setTimeout(() => el.classList.remove('show'), 4500);
+    }
+
+    function onFileSelected(e) { const f = e.target.files[0]; if (f) showFileName(f.name); }
+    function showFileName(name) {
+      const el = document.getElementById('dz-filename');
+      el.textContent = `📄 ${name}`; el.style.display = 'block';
+    }
+    function formatSize(bytes) {
+      return bytes < 1024 ? `${bytes} B` : `${(bytes/1024).toFixed(1)} KB`;
+    }
+</script>
+</body>
+</html>
