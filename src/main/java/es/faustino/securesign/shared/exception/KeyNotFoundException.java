@@ -1,4 +1,4 @@
-package es.faustino.securesign.exception;
+package es.faustino.securesign.shared.exception;
 
 public class KeyNotFoundException extends RuntimeException {
     public KeyNotFoundException(String keyId) {

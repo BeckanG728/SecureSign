@@ -1,10 +1,10 @@
 package es.faustino.securesign;
 
-import es.faustino.securesign.certificate.CertificateX509Service;
-import es.faustino.securesign.document.DocumentService;
 import es.faustino.securesign.dto.response.VerificationResultResponse;
-import es.faustino.securesign.signature.SignatureService;
-import es.faustino.securesign.verification.VerificationService;
+import es.faustino.securesign.services.certificate.CertificateX509Service;
+import es.faustino.securesign.services.document.DocumentService;
+import es.faustino.securesign.services.signature.SignatureService;
+import es.faustino.securesign.services.verification.VerificationService;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.junit.jupiter.api.*;
 

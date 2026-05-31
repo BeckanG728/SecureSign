@@ -1,4 +1,4 @@
-package es.faustino.securesign.exception;
+package es.faustino.securesign.shared.exception;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

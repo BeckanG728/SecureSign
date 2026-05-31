@@ -1,4 +1,4 @@
-package es.faustino.securesign.model;
+package es.faustino.securesign.dto.request;
 
 public record DocumentRequest(
         String nombre,

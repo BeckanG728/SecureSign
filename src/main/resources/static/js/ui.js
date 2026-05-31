@@ -55,7 +55,7 @@ function renderVerifyResult(container, result) {
     const rows = [
         { label: 'Firma criptográfica',    value: boolBadge(result.firmaValida) },
         { label: 'Certificado vigente',    value: boolBadge(result.certificadoVigente) },
-        { label: 'Algoritmo de firma',     value: result.algoritmo  || '—' },
+        { label: 'Algoritmo de firma',     value: result.algoritmoFirma  || '—' },
         { label: 'Sujeto del certificado', value: result.subject     || '—' },
         { label: 'Válido desde',           value: result.validoDesde || '—' },
         { label: 'Válido hasta',           value: result.validoHasta || '—' },
