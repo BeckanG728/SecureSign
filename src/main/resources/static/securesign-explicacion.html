@@ -1,0 +1,1822 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>SecureSign — Explicación del Código</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&family=Geist:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:       #0c0e11;
+    --bg2:      #13161b;
+    --bg3:      #1a1e25;
+    --bg4:      #22262f;
+    --border:   #2a2f3a;
+    --border2:  #353c4a;
+    --text:     #e8eaf0;
+    --muted:    #7a8294;
+    --muted2:   #4a5166;
+    --accent:   #4f9cf9;
+    --accent2:  #1d6fbf;
+    --green:    #3ecf8e;
+    --amber:    #f59e0b;
+    --red:      #f87171;
+    --purple:   #a78bfa;
+    --mono:     'IBM Plex Mono', monospace;
+    --serif:    'Instrument Serif', serif;
+    --sans:     'Geist', sans-serif;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.65;
+    min-height: 100vh;
+  }
+
+  /* ── SCROLLBAR ── */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+  /* ── LAYOUT ── */
+  .shell { display: flex; min-height: 100vh; }
+
+  /* ── SIDEBAR ── */
+  .sidebar {
+    width: 240px;
+    flex-shrink: 0;
+    background: var(--bg2);
+    border-right: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .sidebar-logo {
+    padding: 28px 20px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .sidebar-logo .wordmark {
+    font-family: var(--serif);
+    font-size: 20px;
+    color: var(--text);
+    letter-spacing: -.01em;
+  }
+  .sidebar-logo .wordmark em { font-style: italic; color: var(--accent); }
+  .sidebar-logo .badge {
+    display: inline-block;
+    margin-top: 6px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    padding: 2px 7px;
+    border-radius: 3px;
+    letter-spacing: .04em;
+  }
+
+  .sidebar-nav { padding: 12px 0; flex: 1; }
+  .nav-section {
+    padding: 8px 20px 4px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted2);
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 20px;
+    font-size: 13px;
+    color: var(--muted);
+    cursor: pointer;
+    transition: color .15s, background .15s;
+    border: none;
+    background: none;
+    width: 100%;
+    text-align: left;
+    text-decoration: none;
+    position: relative;
+  }
+  .nav-item:hover { color: var(--text); background: var(--bg3); }
+  .nav-item.active {
+    color: var(--accent);
+    background: rgba(79, 156, 249, 0.07);
+  }
+  .nav-item.active::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 2px;
+    background: var(--accent);
+  }
+  .nav-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: .5; flex-shrink: 0; }
+  .nav-item.active .nav-dot { opacity: 1; }
+
+  /* ── MAIN ── */
+  .main { flex: 1; max-width: 860px; padding: 48px 52px 80px; }
+
+  /* ── SECTION ── */
+  .section { display: none; }
+  .section.active { display: block; }
+
+  /* ── HEADINGS ── */
+  .section-hero { margin-bottom: 40px; }
+  .section-hero h1 {
+    font-family: var(--serif);
+    font-size: 38px;
+    font-weight: 400;
+    line-height: 1.2;
+    color: var(--text);
+    margin-bottom: 10px;
+  }
+  .section-hero h1 em { font-style: italic; color: var(--accent); }
+  .section-hero p { color: var(--muted); font-size: 15px; max-width: 540px; }
+
+  h2 {
+    font-family: var(--serif);
+    font-size: 24px;
+    font-weight: 400;
+    color: var(--text);
+    margin-bottom: 14px;
+    margin-top: 40px;
+  }
+  h2:first-child { margin-top: 0; }
+
+  h3 {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+    margin-bottom: 6px;
+    font-family: var(--sans);
+  }
+
+  p { color: var(--muted); font-size: 14px; line-height: 1.7; margin-bottom: 12px; }
+  p:last-child { margin-bottom: 0; }
+
+  /* ── CODE ── */
+  code {
+    font-family: var(--mono);
+    font-size: 12px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    padding: 1px 5px;
+    border-radius: 3px;
+    color: var(--purple);
+  }
+
+  /* ── FLOW DIAGRAM ── */
+  .flow-container { margin: 24px 0; }
+  .flow-hint { font-family: var(--mono); font-size: 11px; color: var(--muted2); margin-bottom: 14px; }
+
+  .flow { display: flex; flex-direction: column; gap: 0; }
+  .flow-node {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 18px;
+    cursor: pointer;
+    transition: border-color .2s, background .2s, transform .15s;
+    background: var(--bg2);
+    position: relative;
+  }
+  .flow-node:hover { border-color: var(--border2); background: var(--bg3); transform: translateX(2px); }
+  .flow-node.active { border-color: var(--accent); background: rgba(79,156,249,.06); }
+  .flow-node .node-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+    font-family: var(--sans);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .flow-node .node-sub { font-size: 12px; color: var(--muted); margin-top: 3px; font-family: var(--mono); }
+  .flow-node .node-tag {
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 3px;
+    font-weight: 500;
+  }
+  .tag-http  { background: rgba(79,156,249,.15); color: var(--accent); border: 1px solid rgba(79,156,249,.25); }
+  .tag-svc   { background: rgba(62,207,142,.1);  color: var(--green);  border: 1px solid rgba(62,207,142,.2); }
+  .tag-infra { background: rgba(167,139,250,.1); color: var(--purple); border: 1px solid rgba(167,139,250,.2); }
+  .tag-dss   { background: rgba(245,158,11,.1);  color: var(--amber);  border: 1px solid rgba(245,158,11,.2); }
+
+  .flow-arrow {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    padding: 6px 18px;
+    color: var(--muted2);
+    font-size: 12px;
+    font-family: var(--mono);
+  }
+  .flow-arrow svg { width: 12px; height: 12px; margin-right: 6px; opacity: .5; }
+
+  .flow-row { display: flex; gap: 10px; }
+  .flow-row .flow-node { flex: 1; }
+  .flow-connector {
+    display: flex; align-items: center; justify-content: center;
+    width: 30px; flex-shrink: 0; color: var(--muted2); font-size: 12px; font-family: var(--mono);
+  }
+
+  /* ── DETAIL BOX ── */
+  .detail {
+    margin-top: 20px;
+    border: 1px solid var(--border2);
+    border-radius: 10px;
+    overflow: hidden;
+    animation: fadeIn .2s ease;
+  }
+  @keyframes fadeIn { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
+  .detail-header {
+    background: var(--bg3);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 18px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .detail-header h3 { margin: 0; font-size: 13px; }
+  .detail-body { padding: 16px 18px; background: var(--bg2); }
+  .detail-body p { font-size: 13px; line-height: 1.7; }
+  .detail-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
+  .dtag {
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: 3px;
+    border: 1px solid var(--border2);
+    color: var(--muted);
+  }
+  .no-selection {
+    margin-top: 20px;
+    padding: 20px;
+    border: 1px dashed var(--border);
+    border-radius: 8px;
+    text-align: center;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted2);
+  }
+
+  /* ── TABLE ── */
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    margin: 16px 0;
+  }
+  .data-table th {
+    text-align: left;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--muted);
+    font-family: var(--mono);
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+    letter-spacing: .04em;
+  }
+  .data-table td {
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+    vertical-align: top;
+  }
+  .data-table tr:last-child td { border-bottom: none; }
+  .data-table td:first-child { color: var(--muted); font-family: var(--mono); font-size: 12px; white-space: nowrap; }
+  .data-table tr:hover td { background: var(--bg3); }
+
+  /* ── RESPONSE GRID ── */
+  .resp-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin: 16px 0;
+  }
+  .resp-card {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    background: var(--bg2);
+    transition: border-color .15s;
+  }
+  .resp-card:hover { border-color: var(--border2); }
+  .resp-card.ok  { border-color: rgba(62,207,142,.3); background: rgba(62,207,142,.04); }
+  .resp-card.warn { border-color: rgba(245,158,11,.3); background: rgba(245,158,11,.04); }
+  .resp-card .rname {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+  .resp-card.ok .rname  { color: var(--green); }
+  .resp-card.warn .rname { color: var(--amber); }
+  .resp-card .rdesc { font-size: 12px; color: var(--muted); line-height: 1.5; }
+
+  /* ── STATUS MATRIX ── */
+  .matrix { margin: 16px 0; }
+  .matrix-row {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    border-bottom: 1px solid var(--border);
+    padding: 10px 0;
+    font-size: 13px;
+  }
+  .matrix-row:last-child { border-bottom: none; }
+  .matrix-situation { flex: 2; color: var(--text); }
+  .matrix-cell { flex: 1; font-family: var(--mono); font-size: 12px; text-align: center; }
+  .matrix-reason { flex: 3; font-size: 11px; color: var(--muted); font-family: var(--mono); }
+  .ok-val  { color: var(--green); }
+  .bad-val { color: var(--red); }
+  .matrix-header .matrix-situation,
+  .matrix-header .matrix-cell,
+  .matrix-header .matrix-reason {
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--muted2);
+    letter-spacing: .05em;
+    text-transform: uppercase;
+    font-family: var(--mono);
+  }
+
+  /* ── BYTERANGE VISUALIZER ── */
+  .br-visual {
+    margin: 20px 0;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+  }
+  .br-track {
+    height: 40px;
+    border-radius: 6px;
+    background: var(--bg3);
+    position: relative;
+    overflow: hidden;
+    margin-bottom: 10px;
+  }
+  .br-tramo1 {
+    position: absolute; left: 0; top: 0; bottom: 0;
+    background: rgba(62,207,142,.25);
+    border-right: 2px solid var(--green);
+    transition: width .4s cubic-bezier(.4,0,.2,1);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .br-contents {
+    position: absolute; top: 0; bottom: 0;
+    background: rgba(248,113,113,.2);
+    border-left: 2px solid var(--red);
+    border-right: 2px solid var(--red);
+    transition: left .4s cubic-bezier(.4,0,.2,1), width .4s cubic-bezier(.4,0,.2,1);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .br-tramo2 {
+    position: absolute; right: 0; top: 0; bottom: 0;
+    background: rgba(79,156,249,.2);
+    border-left: 2px solid var(--accent);
+    transition: width .4s cubic-bezier(.4,0,.2,1);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .br-label { font-family: var(--mono); font-size: 10px; font-weight: 500; }
+  .br-legend { display: flex; gap: 16px; flex-wrap: wrap; }
+  .br-leg-item { display: flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 11px; color: var(--muted); }
+  .br-leg-dot { width: 10px; height: 10px; border-radius: 2px; }
+  .br-controls { display: flex; gap: 12px; margin-bottom: 14px; align-items: center; }
+  .br-slider { flex: 1; accent-color: var(--accent); cursor: pointer; }
+  .br-slider-label { font-family: var(--mono); font-size: 11px; color: var(--muted); min-width: 80px; }
+  .br-desc { font-size: 12px; color: var(--muted); font-family: var(--mono); margin-top: 10px; line-height: 1.6; }
+
+  /* ── ALGO CARDS ── */
+  .algo-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 16px 0; }
+  .algo-card {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px;
+    background: var(--bg2);
+  }
+  .algo-card .algo-name {
+    font-family: var(--mono);
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--text);
+    margin-bottom: 8px;
+  }
+  .algo-card .algo-name span { color: var(--accent); }
+  .algo-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
+  .algo-row:last-child { border-bottom: none; }
+  .algo-row .akey { color: var(--muted); font-family: var(--mono); font-size: 11px; }
+  .algo-row .aval { color: var(--text); font-family: var(--mono); font-size: 11px; }
+
+  /* ── DIVIDER ── */
+  .divider { border: none; border-top: 1px solid var(--border); margin: 28px 0; }
+
+  /* ── PILLS ── */
+  .pill {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-weight: 500;
+    letter-spacing: .02em;
+  }
+  .pill-green { background: rgba(62,207,142,.12); color: var(--green); border: 1px solid rgba(62,207,142,.25); }
+  .pill-red   { background: rgba(248,113,113,.12); color: var(--red);   border: 1px solid rgba(248,113,113,.25); }
+  .pill-blue  { background: rgba(79,156,249,.12);  color: var(--accent); border: 1px solid rgba(79,156,249,.25); }
+  .pill-amber { background: rgba(245,158,11,.12);  color: var(--amber);  border: 1px solid rgba(245,158,11,.25); }
+
+  /* ── CALLOUT ── */
+  .callout {
+    border-left: 3px solid var(--accent);
+    background: rgba(79,156,249,.05);
+    padding: 12px 16px;
+    border-radius: 0 6px 6px 0;
+    margin: 16px 0;
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.65;
+  }
+  .callout.warn { border-color: var(--amber); background: rgba(245,158,11,.05); }
+  .callout.ok   { border-color: var(--green); background: rgba(62,207,142,.05); }
+
+  /* ── ARCHITECTURE LAYERS ── */
+  .layers { display: flex; flex-direction: column; gap: 0; margin: 20px 0; }
+  .layer {
+    border: 1px solid var(--border);
+    border-radius: 0;
+    padding: 12px 18px;
+    background: var(--bg2);
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .layer:first-child { border-radius: 8px 8px 0 0; }
+  .layer:last-child  { border-radius: 0 0 8px 8px; }
+  .layer + .layer { border-top: none; }
+  .layer-num { font-family: var(--mono); font-size: 11px; color: var(--muted2); width: 20px; }
+  .layer-name { font-size: 13px; font-weight: 500; color: var(--text); min-width: 180px; }
+  .layer-files { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 780px) {
+    .sidebar { display: none; }
+    .main { padding: 24px 20px 60px; max-width: 100%; }
+    .resp-grid { grid-template-columns: 1fr; }
+    .algo-grid { grid-template-columns: 1fr; }
+    .flow-row { flex-direction: column; }
+    .flow-connector { display: none; }
+  }
+
+  /* ── MOBILE NAV ── */
+  .mobile-nav {
+    display: none;
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: var(--bg2);
+    border-top: 1px solid var(--border);
+    z-index: 100;
+    padding: 8px 12px;
+    gap: 4px;
+    overflow-x: auto;
+  }
+  @media (max-width: 780px) { .mobile-nav { display: flex; } }
+  .mob-btn {
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: none;
+    color: var(--muted);
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .mob-btn.active { color: var(--accent); border-color: var(--accent); }
+</style>
+</head>
+<body>
+
+<div class="shell">
+
+  <!-- ─── SIDEBAR ─── -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="wordmark">Secure<em>Sign</em></div>
+      <div class="badge">Spring Boot 4 · DSS 6.4</div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section">Introducción</div>
+      <button class="nav-item active" onclick="showSection('overview')">
+        <span class="nav-dot"></span> Visión general
+      </button>
+      <button class="nav-item" onclick="showSection('arquitectura')">
+        <span class="nav-dot"></span> Arquitectura
+      </button>
+      <div class="nav-section" style="margin-top:8px">Flujos</div>
+      <button class="nav-item" onclick="showSection('flujo-firma')">
+        <span class="nav-dot"></span> Firmar PDF
+      </button>
+      <button class="nav-item" onclick="showSection('flujo-verify')">
+        <span class="nav-dot"></span> Verificar firma
+      </button>
+      <div class="nav-section" style="margin-top:8px">Conceptos clave</div>
+      <button class="nav-item" onclick="showSection('pades')">
+        <span class="nav-dot"></span> PAdES y formatos
+      </button>
+      <button class="nav-item" onclick="showSection('pkcs12')">
+        <span class="nav-dot"></span> PKCS#12 / .p12
+      </button>
+      <button class="nav-item" onclick="showSection('cos')">
+        <span class="nav-dot"></span> COS (PDF interno)
+      </button>
+      <button class="nav-item" onclick="showSection('asn1')">
+        <span class="nav-dot"></span> ASN.1
+      </button>
+      <button class="nav-item" onclick="showSection('byterange')">
+        <span class="nav-dot"></span> ByteRange
+      </button>
+      <button class="nav-item" onclick="showSection('cms')">
+        <span class="nav-dot"></span> CMS / PKCS#7
+      </button>
+      <button class="nav-item" onclick="showSection('der')">
+        <span class="nav-dot"></span> DER (encoding)
+      </button>
+      <button class="nav-item" onclick="showSection('x509')">
+        <span class="nav-dot"></span> Certificado X.509
+      </button>
+      <button class="nav-item" onclick="showSection('algoritmos')">
+        <span class="nav-dot"></span> Algoritmos
+      </button>
+      <button class="nav-item" onclick="showSection('respuesta')">
+        <span class="nav-dot"></span> JSON de respuesta
+      </button>
+      <div class="nav-section" style="margin-top:8px">Librerías</div>
+      <button class="nav-item" onclick="showSection('lib-dss')">
+        <span class="nav-dot"></span> EU DSS
+      </button>
+      <button class="nav-item" onclick="showSection('lib-pdfbox')">
+        <span class="nav-dot"></span> Apache PDFBox
+      </button>
+      <button class="nav-item" onclick="showSection('lib-bc')">
+        <span class="nav-dot"></span> BouncyCastle
+      </button>
+      <button class="nav-item" onclick="showSection('lib-otras')">
+        <span class="nav-dot"></span> Otras dependencias
+      </button>
+    </nav>
+  </aside>
+
+  <!-- ─── MAIN ─── -->
+  <main class="main">
+
+    <!-- ══ OVERVIEW ══ -->
+    <section id="overview" class="section active">
+      <div class="section-hero">
+        <h1>¿Qué hace <em>SecureSign</em>?</h1>
+        <p>API REST que firma documentos PDF con firma digital PAdES embebida y verifica esas firmas. Construido con Spring Boot 4, DSS de la UE y BouncyCastle.</p>
+      </div>
+
+      <h2>La idea en una frase</h2>
+      <p>Un cliente sube un PDF → SecureSign genera una clave criptográfica, la usa para firmar el documento con el estándar PAdES y devuelve el PDF con la firma incrustada. Cualquiera puede verificar después que el documento no fue alterado.</p>
+
+      <div class="callout ok">
+        La verificación es completamente <strong>offline</strong>: el certificado del firmante viaja dentro del propio PDF, en el bloque <code>/Contents</code>. No hay base de datos ni CA externa que consultar.
+      </div>
+
+      <h2>Los dos endpoints</h2>
+      <table class="data-table">
+        <thead><tr><th>Endpoint</th><th>Entrada</th><th>Salida</th></tr></thead>
+        <tbody>
+          <tr><td>POST /api/documents/sign</td><td>PDF + algorithm (EC o Ed25519)</td><td>PDF firmado (descarga)</td></tr>
+          <tr><td>POST /api/documents/verify</td><td>PDF firmado</td><td>JSON con resultado de verificación</td></tr>
+        </tbody>
+      </table>
+
+      <h2>Stack tecnológico</h2>
+      <table class="data-table">
+        <thead><tr><th>Tecnología</th><th>Versión</th><th>Rol</th></tr></thead>
+        <tbody>
+          <tr><td>Java</td><td>17</td><td>Lenguaje base</td></tr>
+          <tr><td>Spring Boot</td><td>4.0.6</td><td>Framework HTTP y DI</td></tr>
+          <tr><td>EU DSS</td><td>6.4</td><td>Firma PAdES — produce el bloque CMS y el ByteRange correcto</td></tr>
+          <tr><td>Apache PDFBox</td><td>3.0.3</td><td>Manipulación de PDF. La versión 3.x es obligatoria con DSS 6.x</td></tr>
+          <tr><td>BouncyCastle</td><td>BOM DSS 6.4</td><td>Verificación CMS, emisión de certificados X.509</td></tr>
+          <tr><td>PKCS#12</td><td>—</td><td>Persistencia de claves privadas en disco (securesign.p12)</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ══ ARQUITECTURA ══ -->
+    <section id="arquitectura" class="section">
+      <div class="section-hero">
+        <h1>Arquitectura en <em>capas</em></h1>
+        <p>El proyecto sigue la separación estándar de Spring Boot: HTTP → Controller → Service → Infraestructura.</p>
+      </div>
+
+      <div class="layers">
+        <div class="layer">
+          <div class="layer-num">1</div>
+          <div class="layer-name">HTTP / Controller</div>
+          <div class="layer-files">DocumentController.java</div>
+        </div>
+        <div class="layer">
+          <div class="layer-num">2</div>
+          <div class="layer-name">Orquestación</div>
+          <div class="layer-files">DocumentService.java</div>
+        </div>
+        <div class="layer">
+          <div class="layer-num">3</div>
+          <div class="layer-name">Lógica de dominio</div>
+          <div class="layer-files">SignatureService · VerificationService · KeyManagementService · CertificateX509Service</div>
+        </div>
+        <div class="layer">
+          <div class="layer-num">4</div>
+          <div class="layer-name">Infraestructura</div>
+          <div class="layer-files">KeyStoreService (PKCS#12 en disco) · ByteRangeExtractor</div>
+        </div>
+        <div class="layer">
+          <div class="layer-num">5</div>
+          <div class="layer-name">Librerías externas</div>
+          <div class="layer-files">DSS 6.4 · PDFBox 3.x · BouncyCastle</div>
+        </div>
+      </div>
+
+      <h2>Regla de dependencias</h2>
+      <p>Las capas superiores dependen de las inferiores, nunca al revés. El Controller no sabe nada de criptografía; los servicios de dominio no saben nada de HTTP.</p>
+
+      <div class="callout">
+        <strong>DocumentController</strong> solo extrae el <code>MultipartFile</code> y construye el <code>ResponseEntity</code>. Toda la lógica de negocio está en los servicios — el controlador no toma ninguna decisión criptográfica.
+      </div>
+
+      <h2>Configuración relevante</h2>
+      <table class="data-table">
+        <thead><tr><th>Clave</th><th>Por defecto</th><th>Significado</th></tr></thead>
+        <tbody>
+          <tr><td>securesign.keystore-path</td><td>securesign.p12</td><td>Ruta del archivo PKCS#12 en disco</td></tr>
+          <tr><td>securesign.keystore-password</td><td><em>(obligatorio)</em></td><td>Contraseña del KeyStore. Inyectada vía <code>SECURESIGN_KEYSTORE_PASSWORD</code></td></tr>
+          <tr><td>server.port</td><td>8080</td><td>Puerto HTTP</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ══ FLUJO FIRMA ══ -->
+    <section id="flujo-firma" class="section">
+      <div class="section-hero">
+        <h1>Flujo: <em>firmar</em> un PDF</h1>
+        <p>Haz clic en cada componente para ver qué hace exactamente.</p>
+      </div>
+
+      <div class="flow-container">
+        <div class="flow-hint">// POST /api/documents/sign — multipart/form-data</div>
+        <div class="flow">
+
+          <div class="flow-node" id="fn-http" onclick="flowDetail('firma','http')">
+            <div class="node-label">
+              <span class="node-tag tag-http">HTTP</span>
+              POST /api/documents/sign
+            </div>
+            <div class="node-sub">file: PDF · algorithm: "EC" | "Ed25519"</div>
+          </div>
+
+          <div class="flow-arrow">
+            <svg viewBox="0 0 12 16" fill="none"><path d="M6 1v14M1 10l5 5 5-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            delega
+          </div>
+
+          <div class="flow-node" id="fn-ctrl" onclick="flowDetail('firma','ctrl')">
+            <div class="node-label">
+              <span class="node-tag tag-svc">Controller</span>
+              DocumentController.generate()
+            </div>
+            <div class="node-sub">Extrae bytes + algorithm → llama a DocumentService</div>
+          </div>
+
+          <div class="flow-arrow">
+            <svg viewBox="0 0 12 16" fill="none"><path d="M6 1v14M1 10l5 5 5-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            orquesta
+          </div>
+
+          <div class="flow-node" id="fn-docsvc" onclick="flowDetail('firma','docsvc')">
+            <div class="node-label">
+              <span class="node-tag tag-svc">Service</span>
+              DocumentService.firmarDocumento()
+            </div>
+            <div class="node-sub">genera clave → obtiene cert → firma</div>
+          </div>
+
+          <div class="flow-arrow">
+            <svg viewBox="0 0 12 16" fill="none"><path d="M6 1v14M1 10l5 5 5-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            genera clave
+          </div>
+
+          <div class="flow-row">
+            <div class="flow-node" id="fn-keymgmt" onclick="flowDetail('firma','keymgmt')">
+              <div class="node-label">
+                <span class="node-tag tag-svc">Service</span>
+                KeyManagementService
+              </div>
+              <div class="node-sub">Genera par EC/Ed25519 + cert X.509</div>
+            </div>
+            <div class="flow-connector">→</div>
+            <div class="flow-node" id="fn-keystore" onclick="flowDetail('firma','keystore')">
+              <div class="node-label">
+                <span class="node-tag tag-infra">Infra</span>
+                KeyStoreService
+              </div>
+              <div class="node-sub">Persiste en securesign.p12</div>
+            </div>
+          </div>
+
+          <div class="flow-arrow">
+            <svg viewBox="0 0 12 16" fill="none"><path d="M6 1v14M1 10l5 5 5-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            genera cert y firma
+          </div>
+
+          <div class="flow-row">
+            <div class="flow-node" id="fn-certx509" onclick="flowDetail('firma','certx509')">
+              <div class="node-label">
+                <span class="node-tag tag-infra">BC</span>
+                CertificateX509Service
+              </div>
+              <div class="node-sub">X.509v3 autofirmado con BouncyCastle</div>
+            </div>
+            <div class="flow-connector">→</div>
+            <div class="flow-node" id="fn-sigsvc" onclick="flowDetail('firma','sigsvc')">
+              <div class="node-label">
+                <span class="node-tag tag-dss">DSS</span>
+                SignatureService.firmarPdf()
+              </div>
+              <div class="node-sub">PAdES Baseline-B con DSS + PDFBox 3.x</div>
+            </div>
+          </div>
+
+          <div class="flow-arrow">
+            <svg viewBox="0 0 12 16" fill="none"><path d="M6 1v14M1 10l5 5 5-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            responde
+          </div>
+
+          <div class="flow-node" id="fn-resp" onclick="flowDetail('firma','resp')">
+            <div class="node-label">
+              <span class="node-tag tag-http">HTTP 200</span>
+              application/pdf — PDF firmado
+            </div>
+            <div class="node-sub">Firma PAdES embebida en /Contents · descarga directa</div>
+          </div>
+
+        </div>
+        <div id="detail-firma"><div class="no-selection">← Haz clic en un nodo para ver su detalle</div></div>
+      </div>
+    </section>
+
+    <!-- ══ FLUJO VERIFICAR ══ -->
+    <section id="flujo-verify" class="section">
+      <div class="section-hero">
+        <h1>Flujo: <em>verificar</em> una firma</h1>
+        <p>Haz clic en cada componente para entender qué comprueba.</p>
+      </div>
+
+      <div class="flow-container">
+        <div class="flow-hint">// POST /api/documents/verify — multipart/form-data</div>
+        <div class="flow">
+
+          <div class="flow-node" id="vn-http" onclick="flowDetail('verify','http')">
+            <div class="node-label">
+              <span class="node-tag tag-http">HTTP</span>
+              POST /api/documents/verify
+            </div>
+            <div class="node-sub">file: PDF firmado (sin parámetros adicionales)</div>
+          </div>
+
+          <div class="flow-arrow"><svg viewBox="0 0 12 16" fill="none"><path d="M6 1v14M1 10l5 5 5-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg> delega</div>
+
+          <div class="flow-node" id="vn-ctrl" onclick="flowDetail('verify','ctrl')">
+            <div class="node-label"><span class="node-tag tag-svc">Controller</span> DocumentController.verify()</div>
+            <div class="node-sub">Extrae bytes → llama a VerificationService</div>
+          </div>
+
+          <div class="flow-arrow"><svg viewBox="0 0 12 16" fill="none"><path d="M6 1v14M1 10l5 5 5-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg> parsea PDF</div>
+
+          <div class="flow-node" id="vn-byre" onclick="flowDetail('verify','byre')">
+            <div class="node-label"><span class="node-tag tag-infra">Util</span> ByteRangeExtractor.extraer()</div>
+            <div class="node-sub">Lee /ByteRange, extrae bytes firmados y bloque CMS DER</div>
+          </div>
+
+          <div class="flow-arrow"><svg viewBox="0 0 12 16" fill="none"><path d="M6 1v14M1 10l5 5 5-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg> parsea CMS</div>
+
+          <div class="flow-node" id="vn-cms" onclick="flowDetail('verify','cms')">
+            <div class="node-label"><span class="node-tag tag-infra">BC</span> CMSSignedData</div>
+            <div class="node-sub">Parsea DER → certificado X.509 + SignerInfo</div>
+          </div>
+
+          <div class="flow-arrow"><svg viewBox="0 0 12 16" fill="none"><path d="M6 1v14M1 10l5 5 5-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg> verifica</div>
+
+          <div class="flow-row">
+            <div class="flow-node" id="vn-cert" onclick="flowDetail('verify','cert')">
+              <div class="node-label"><span class="node-tag tag-infra">X.509</span> Certificado</div>
+              <div class="node-sub">Subject, vigencia, algoritmo</div>
+            </div>
+            <div class="flow-connector">+</div>
+            <div class="flow-node" id="vn-sig" onclick="flowDetail('verify','sig')">
+              <div class="node-label"><span class="node-tag tag-dss">Crypto</span> SignerInformation.verify()</div>
+              <div class="node-sub">Hash del doc vs valor de firma</div>
+            </div>
+          </div>
+
+          <div class="flow-arrow"><svg viewBox="0 0 12 16" fill="none"><path d="M6 1v14M1 10l5 5 5-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg> responde</div>
+
+          <div class="flow-node" id="vn-resp" onclick="flowDetail('verify','resp')">
+            <div class="node-label"><span class="node-tag tag-http">HTTP 200</span> VerificationResultResponse (JSON)</div>
+            <div class="node-sub">valid · firmaValida · certificadoVigente · subject · algoritmo…</div>
+          </div>
+
+        </div>
+        <div id="detail-verify"><div class="no-selection">← Haz clic en un nodo para ver su detalle</div></div>
+      </div>
+    </section>
+
+    <!-- ══ PADES ══ -->
+    <section id="pades" class="section">
+      <div class="section-hero">
+        <h1>PAdES — <em>PDF Advanced Electronic Signatures</em></h1>
+        <p>El estándar europeo que define cómo incrustar firmas digitales avanzadas dentro de un documento PDF. Es el formato que produce y verifica SecureSign.</p>
+      </div>
+
+      <h2>¿Qué es PAdES?</h2>
+      <p>PAdES (ETSI EN 319 102 / TS 102 778) es el perfil de firma electrónica avanzada sobre PDF definido por el ETSI (Instituto Europeo de Normas de Telecomunicaciones) y reconocido por el reglamento eIDAS de la Unión Europea. Especifica exactamente cómo estructurar, empaquetar e identificar una firma dentro de un PDF para que sea interoperable, auditable y legalmente válida en todos los estados miembros de la UE.</p>
+
+      <div class="callout">
+        PAdES no inventa un nuevo formato de firma: usa <strong>CMS/PKCS#7</strong> como contenedor criptográfico y <strong>el propio PDF</strong> como sobre exterior. Lo que PAdES define es <em>cómo</em> incrustar ese CMS dentro del PDF de forma estándar e interoperable.
+      </div>
+
+      <h2>PAdES vs. otros formatos de firma</h2>
+      <table class="data-table">
+        <thead><tr><th>Formato</th><th>Documento base</th><th>Contenedor criptográfico</th><th>Uso típico</th></tr></thead>
+        <tbody>
+          <tr><td><strong>PAdES</strong></td><td>PDF</td><td>CMS / PKCS#7</td><td>Facturas electrónicas, contratos, documentos legales en PDF</td></tr>
+          <tr><td>XAdES</td><td>XML</td><td>XML-DSig</td><td>Facturas XML, mensajes SOAP, documentos estructurados</td></tr>
+          <tr><td>CAdES</td><td>Cualquier binario</td><td>CMS / PKCS#7</td><td>Correos, archivos genéricos, software</td></tr>
+          <tr><td>JAdES</td><td>JSON</td><td>JSON Web Signature (JWS)</td><td>APIs REST, tokens firmados</td></tr>
+          <tr><td>ASiC</td><td>Contenedor ZIP</td><td>XAdES o CAdES</td><td>Múltiples documentos firmados juntos</td></tr>
+        </tbody>
+      </table>
+
+      <h2>Niveles de conformidad PAdES</h2>
+      <p>PAdES define cuatro niveles progresivos. Cada nivel incluye todo lo del anterior más información adicional para garantizar la validez a largo plazo:</p>
+      <table class="data-table">
+        <thead><tr><th>Nivel</th><th>Nombre completo</th><th>Qué añade</th><th>SecureSign</th></tr></thead>
+        <tbody>
+          <tr><td><strong>B</strong></td><td>Baseline</td><td>Firma CMS básica con certificado embebido. Sin sello de tiempo.</td><td><span class="pill pill-green">Implementado</span></td></tr>
+          <tr><td>T</td><td>Timestamp</td><td>Sello de tiempo de una TSA (Trusted Stamp Authority) sobre la firma.</td><td><span class="pill pill-red">No incluido</span></td></tr>
+          <tr><td>LT</td><td>Long-Term</td><td>Datos de revocación (CRL / OCSP) embebidos para validación offline futura.</td><td><span class="pill pill-red">No incluido</span></td></tr>
+          <tr><td>LTA</td><td>Long-Term Archival</td><td>Sellos de tiempo adicionales sobre los datos de revocación. Validez de décadas.</td><td><span class="pill pill-red">No incluido</span></td></tr>
+        </tbody>
+      </table>
+
+      <div class="callout warn">
+        <strong>Baseline-B es suficiente para demostrar integridad</strong>, pero no prueba <em>cuándo</em> se firmó (sin TSA, el reloj del firmante es la única referencia). Para uso legal o archival se recomienda al menos el nivel T.
+      </div>
+
+      <h2>Packaging: ENVELOPED</h2>
+      <p>PAdES siempre usa packaging <strong>ENVELOPED</strong>: la firma (el CMS) se incrusta <em>dentro</em> del propio PDF, en el campo <code>/Contents</code> del diccionario de firma. Esto contrasta con packaging <em>detached</em> (firma en archivo separado) o <em>enveloping</em> (el documento dentro de la firma). La ventaja del packaging ENVELOPED es que el archivo PDF es autónomo: lo contiene todo.</p>
+
+      <h2>Estructura de un PDF firmado con PAdES</h2>
+      <div class="callout">
+        Un PDF firmado PAdES tiene estos elementos en su estructura interna (árbol COS):<br><br>
+        <code>/AcroForm → /Fields → [campo de firma]</code><br>
+        <code>/SigFlags = 3</code> — indica que el PDF contiene una firma<br>
+        <code>/ByteRange = [0, t1, t2, t3]</code> — offsets de los bytes firmados<br>
+        <code>/Contents = &lt;DER hex&gt;</code> — el bloque CMS codificado en hex ASCII<br>
+        <code>/SubFilter = /ETSI.CAdES.detached</code> — identifica el perfil PAdES
+      </div>
+
+      <h2>El campo /SubFilter</h2>
+      <p>El <code>/SubFilter</code> dentro del diccionario de firma identifica el estándar exacto. DSS escribe <code>/ETSI.CAdES.detached</code> para PAdES Baseline. Otros valores posibles son <code>/adbe.pkcs7.detached</code> (formato Adobe propietario) o <code>/adbe.pkcs7.sha1</code> (obsoleto). Los verificadores PAdES solo aceptan el valor ETSI.</p>
+    </section>
+
+    <!-- ══ PKCS12 ══ -->
+    <section id="pkcs12" class="section">
+      <div class="section-hero">
+        <h1>PKCS#12 — <em>el archivo .p12</em></h1>
+        <p>El formato estándar para almacenar claves privadas y certificados juntos, protegidos por contraseña. Es la "billetera criptográfica" de SecureSign.</p>
+      </div>
+
+      <h2>¿Qué es PKCS#12?</h2>
+      <p>PKCS#12 (RFC 7292, también conocido como PFX) es un formato de archivo binario que empaqueta en un solo contenedor protegido por contraseña: una o varias <strong>claves privadas</strong>, sus <strong>certificados X.509</strong> asociados y opcionalmente la cadena completa de certificados de confianza. Las extensiones de archivo habituales son <code>.p12</code> y <code>.pfx</code> (este último viene del mundo Windows/IIS).</p>
+
+      <div class="callout">
+        Internamente, un archivo <code>.p12</code> es una estructura ASN.1 DER que contiene <em>SafeBags</em>: bolsas de contenido que pueden ser <code>KeyBag</code> (clave privada), <code>CertBag</code> (certificado) o <code>PKCS8ShroudedKeyBag</code> (clave privada cifrada). Todo el conjunto se protege con una MAC y con cifrado basado en contraseña (PBE).
+      </div>
+
+      <h2>PKCS#12 en SecureSign</h2>
+      <p>SecureSign mantiene un único archivo <code>securesign.p12</code> en disco. Cada vez que se firma un documento, se genera un nuevo par de claves con un alias UUID y se almacena en este archivo. El archivo crece con el tiempo, acumulando todas las claves históricas.</p>
+
+      <table class="data-table">
+        <thead><tr><th>Operación</th><th>Clase</th><th>Método JDK</th></tr></thead>
+        <tbody>
+          <tr><td>Crear vacío</td><td><code>KeyStoreService</code></td><td><code>KeyStore.getInstance("PKCS12")</code> + <code>load(null, password)</code></td></tr>
+          <tr><td>Cargar desde disco</td><td><code>KeyStoreService</code></td><td><code>load(FileInputStream, password)</code></td></tr>
+          <tr><td>Guardar entrada</td><td><code>KeyStoreService</code></td><td><code>setKeyEntry(alias, privateKey, password, certChain)</code></td></tr>
+          <tr><td>Guardar a disco</td><td><code>KeyStoreService</code></td><td><code>store(FileOutputStream, password)</code></td></tr>
+          <tr><td>Leer clave privada</td><td><code>KeyManagementService</code></td><td><code>getKey(alias, password)</code></td></tr>
+          <tr><td>Leer certificado</td><td><code>KeyManagementService</code></td><td><code>getCertificate(alias)</code></td></tr>
+        </tbody>
+      </table>
+
+      <h2>Protección de la contraseña</h2>
+      <p>La contraseña del PKCS#12 nunca se escribe en <code>application.properties</code> directamente. Se inyecta desde la variable de entorno <code>SECURESIGN_KEYSTORE_PASSWORD</code> mediante <code>@Value("${securesign.keystore-password}")</code>. En producción se recomienda gestionarla con un gestor de secretos (Vault, AWS Secrets Manager, etc.).</p>
+
+      <h2>PKCS#12 vs. otros keystores</h2>
+      <table class="data-table">
+        <thead><tr><th>Formato</th><th>Extensión</th><th>Descripción</th><th>Uso recomendado</th></tr></thead>
+        <tbody>
+          <tr><td><strong>PKCS#12</strong></td><td>.p12, .pfx</td><td>Estándar RFC. Portátil entre plataformas y lenguajes.</td><td>Producción, interoperabilidad</td></tr>
+          <tr><td>JKS</td><td>.jks</td><td>Java KeyStore propietario de Sun/Oracle. No es portátil fuera de Java.</td><td>Proyectos Java legacy</td></tr>
+          <tr><td>JCEKS</td><td>.jceks</td><td>Extensión de JKS con soporte para claves secretas simétricas.</td><td>Claves AES en Java</td></tr>
+          <tr><td>PEM</td><td>.pem</td><td>Clave privada y cert en texto Base64 separados. No es un keystore.</td><td>Servidores NGINX/Apache</td></tr>
+        </tbody>
+      </table>
+
+      <div class="callout ok">
+        Desde Java 9, el tipo de KeyStore por defecto pasó de JKS a PKCS12. <code>KeyStore.getInstance("PKCS12")</code> usa la implementación nativa del JDK sin necesidad de BouncyCastle.
+      </div>
+    </section>
+
+    <!-- ══ COS ══ -->
+    <section id="cos" class="section">
+      <div class="section-hero">
+        <h1>COS — <em>Carousel Object Structure</em></h1>
+        <p>El modelo de datos interno del formato PDF. Todo lo que hay en un PDF —páginas, fuentes, imágenes, firmas— son objetos COS.</p>
+      </div>
+
+      <h2>¿Qué es COS?</h2>
+      <p>COS (Carousel Object Structure) es el sistema de tipos y la estructura de datos que define el formato PDF a bajo nivel. El nombre "Carousel" viene de los primeros prototipos de Adobe. Cuando abrimos un PDF, lo que hay en el disco es una secuencia de objetos COS organizados en un árbol, con una tabla de referencias (<em>xref</em>) que permite acceso aleatorio a cualquier objeto sin leer el archivo entero.</p>
+
+      <h2>Tipos de objetos COS</h2>
+      <table class="data-table">
+        <thead><tr><th>Tipo COS</th><th>Sintaxis PDF</th><th>Clase PDFBox</th><th>Ejemplo</th></tr></thead>
+        <tbody>
+          <tr><td>Boolean</td><td><code>true</code> / <code>false</code></td><td><code>COSBoolean</code></td><td>Flags de permisos</td></tr>
+          <tr><td>Integer</td><td><code>42</code></td><td><code>COSInteger</code></td><td>Número de páginas, offsets</td></tr>
+          <tr><td>Real</td><td><code>3.14</code></td><td><code>COSFloat</code></td><td>Coordenadas de página</td></tr>
+          <tr><td>String</td><td><code>(texto)</code> o <code>&lt;hex&gt;</code></td><td><code>COSString</code></td><td>Metadatos, <code>/Contents</code> de la firma</td></tr>
+          <tr><td>Name</td><td><code>/NombreClave</code></td><td><code>COSName</code></td><td><code>/Type</code>, <code>/ByteRange</code>, <code>/SubFilter</code></td></tr>
+          <tr><td>Array</td><td><code>[ v1 v2 v3 ]</code></td><td><code>COSArray</code></td><td>El array <code>/ByteRange</code></td></tr>
+          <tr><td>Dictionary</td><td><code>&lt;&lt; /Key Val &gt;&gt;</code></td><td><code>COSDictionary</code></td><td>Diccionario de firma, de página, de fuente</td></tr>
+          <tr><td>Stream</td><td>Dictionary + <code>stream…endstream</code></td><td><code>COSStream</code></td><td>Contenido de página, imágenes, fuentes embebidas</td></tr>
+          <tr><td>Null</td><td><code>null</code></td><td><code>COSNull</code></td><td>Valores opcionales ausentes</td></tr>
+          <tr><td>Indirect Object</td><td><code>N G obj … endobj</code></td><td><code>COSObject</code></td><td>Cualquier objeto referenciado por número</td></tr>
+        </tbody>
+      </table>
+
+      <h2>El diccionario de firma en COS</h2>
+      <p>Una firma PAdES se representa en el árbol COS como un <code>COSDictionary</code> de tipo <code>/Sig</code> con estos campos clave:</p>
+      <div class="callout">
+        <code>/Type /Sig</code> — identifica el diccionario como campo de firma<br>
+        <code>/Filter /Adobe.PPKLite</code> — handler de firma<br>
+        <code>/SubFilter /ETSI.CAdES.detached</code> — perfil PAdES<br>
+        <code>/ByteRange [0 t1 t2 t3]</code> — <code>COSArray</code> con los 4 offsets<br>
+        <code>/Contents &lt;DER en hex&gt;</code> — <code>COSString</code> con el bloque CMS<br>
+        <code>/M (D:20240101120000Z)</code> — fecha de firma (opcional en Baseline-B)
+      </div>
+
+      <h2>COS y PDFBox en SecureSign</h2>
+      <p>PDFBox expone el árbol COS directamente. En <code>ByteRangeExtractor</code>, la llamada <code>doc.getSignatureDictionaries()</code> devuelve una lista de <code>PDSignature</code>, que es un wrapper Java sobre el <code>COSDictionary</code> subyacente. Los métodos <code>sig.getByteRange()</code> y <code>sig.getContents(bytes)</code> leen los campos COS <code>/ByteRange</code> y <code>/Contents</code> respectivamente, abstrayendo el parseo del formato binario.</p>
+
+      <h2>La tabla xref y los offsets</h2>
+      <p>El PDF guarda una tabla xref (cross-reference) que mapea cada número de objeto indirecto a su offset en bytes dentro del archivo. Cuando DSS escribe la firma en el <code>/Contents</code>, debe conocer el offset exacto de ese campo para escribir el <code>/ByteRange</code> correcto. PDFBox 2.x calculaba este offset antes de actualizar la xref, produciendo una desalineación. PDFBox 3.x lo calcula después, garantizando que el <code>/ByteRange</code> apunta a los bytes correctos.</p>
+    </section>
+
+    <!-- ══ ASN1 ══ -->
+    <section id="asn1" class="section">
+      <div class="section-hero">
+        <h1>ASN.1 — <em>Abstract Syntax Notation One</em></h1>
+        <p>El lenguaje de definición de estructuras de datos que subyace a todos los estándares criptográficos: X.509, CMS, PKCS#12, algoritmos de firma. Si los datos criptográficos son el contenido, ASN.1 es la gramática.</p>
+      </div>
+
+      <h2>¿Qué es ASN.1?</h2>
+      <p>ASN.1 (ISO/IEC 8824) es un lenguaje de descripción de tipos de datos abstractos, independiente de plataforma, lenguaje de programación y arquitectura de hardware. Se usa para definir la estructura de mensajes y datos en protocolos de red (X.400, LDAP, SNMP) y en criptografía (X.509, CMS, PKCS#*). Cuando ves un certificado, una firma o una clave pública, su estructura interna está descrita en ASN.1.</p>
+
+      <h2>Tipos primitivos de ASN.1</h2>
+      <table class="data-table">
+        <thead><tr><th>Tipo ASN.1</th><th>Tag DER (hex)</th><th>Uso en criptografía</th></tr></thead>
+        <tbody>
+          <tr><td><code>BOOLEAN</code></td><td><code>0x01</code></td><td>Flags en extensiones X.509 (¿es crítica?)</td></tr>
+          <tr><td><code>INTEGER</code></td><td><code>0x02</code></td><td>Número de serie del certificado, versión, componentes de firma ECDSA (<em>r</em>, <em>s</em>)</td></tr>
+          <tr><td><code>BIT STRING</code></td><td><code>0x03</code></td><td>Claves públicas, valores de firma</td></tr>
+          <tr><td><code>OCTET STRING</code></td><td><code>0x04</code></td><td>Hash digests, claves simétricas cifradas, <code>/Contents</code> del PDF</td></tr>
+          <tr><td><code>NULL</code></td><td><code>0x05</code></td><td>Parámetros ausentes (p.ej. en RSA: <code>AlgorithmIdentifier</code> con params null)</td></tr>
+          <tr><td><code>OBJECT IDENTIFIER</code></td><td><code>0x06</code></td><td>Identifica algoritmos, extensiones, tipos de contenido. P.ej. <code>1.2.840.10045.4.3.2</code> = SHA256withECDSA</td></tr>
+          <tr><td><code>UTF8String</code></td><td><code>0x0C</code></td><td>Subject/Issuer DN (CN, O, C) en certificados modernos</td></tr>
+          <tr><td><code>UTCTime</code></td><td><code>0x17</code></td><td>Fechas en certificados (para años 1950–2049)</td></tr>
+          <tr><td><code>GeneralizedTime</code></td><td><code>0x18</code></td><td>Fechas en certificados (para años fuera de UTCTime)</td></tr>
+          <tr><td><code>SEQUENCE</code></td><td><code>0x30</code></td><td>Contenedor ordenado. Base de casi toda estructura criptográfica.</td></tr>
+          <tr><td><code>SET</code></td><td><code>0x31</code></td><td>Contenedor no ordenado. Se usa en <code>digestAlgorithms</code> y <code>signerInfos</code> del CMS.</td></tr>
+        </tbody>
+      </table>
+
+      <h2>OIDs — Object Identifiers</h2>
+      <p>Un OID es una secuencia de enteros separados por puntos que identifica globalmente un objeto dentro del árbol de nombres ISO. En criptografía, cada algoritmo, extensión y tipo de contenido tiene su OID único. BouncyCastle los resuelve a nombres legibles; DSS los usa para construir los <code>AlgorithmIdentifier</code> del CMS.</p>
+      <table class="data-table">
+        <thead><tr><th>OID</th><th>Nombre</th><th>Aparece en SecureSign</th></tr></thead>
+        <tbody>
+          <tr><td><code>1.2.840.10045.4.3.2</code></td><td>SHA256withECDSA</td><td>Algoritmo de firma EC en CMS y certificado</td></tr>
+          <tr><td><code>1.3.101.112</code></td><td>Ed25519</td><td>Algoritmo de firma Ed25519</td></tr>
+          <tr><td><code>2.16.840.1.101.3.4.2.1</code></td><td>SHA-256</td><td>DigestAlgorithm en el SignerInfo</td></tr>
+          <tr><td><code>2.16.840.1.101.3.4.2.3</code></td><td>SHA-512</td><td>DigestAlgorithm para Ed25519</td></tr>
+          <tr><td><code>1.2.840.113549.1.7.2</code></td><td>id-signedData</td><td>Tipo de contenido del CMS</td></tr>
+          <tr><td><code>2.5.4.3</code></td><td>commonName (CN)</td><td>Subject/Issuer del certificado X.509</td></tr>
+          <tr><td><code>2.5.29.15</code></td><td>KeyUsage</td><td>Extensión X.509v3 de uso de clave</td></tr>
+          <tr><td><code>2.5.29.19</code></td><td>BasicConstraints</td><td>Extensión CA:false del certificado</td></tr>
+        </tbody>
+      </table>
+
+      <h2>Reglas de codificación</h2>
+      <p>ASN.1 define la <em>estructura lógica</em> de los datos, pero no cómo serializarlos en bytes. Para eso existen reglas de codificación separadas:</p>
+      <table class="data-table">
+        <thead><tr><th>Regla</th><th>Descripción</th><th>Uso</th></tr></thead>
+        <tbody>
+          <tr><td>BER</td><td>Basic Encoding Rules. Flexible: permite múltiples representaciones del mismo valor.</td><td>Punto de partida teórico.</td></tr>
+          <tr><td><strong>DER</strong></td><td>Distinguished Encoding Rules. Subconjunto estricto de BER: una sola representación posible. Obligatorio en firmas y certificados.</td><td>Certificados X.509, CMS, PKCS#12 — todo lo que circula en SecureSign.</td></tr>
+          <tr><td>PER</td><td>Packed Encoding Rules. Optimizado para tamaño mínimo.</td><td>Protocolos de radio (4G/5G).</td></tr>
+          <tr><td>XER</td><td>XML Encoding Rules. ASN.1 serializado como XML.</td><td>Interoperabilidad con sistemas XML.</td></tr>
+        </tbody>
+      </table>
+
+      <h2>ASN.1 en SecureSign</h2>
+      <p>Todo el código de SecureSign que toca criptografía trabaja con estructuras ASN.1 sin saberlo explícitamente, porque BouncyCastle y DSS lo abstraen:</p>
+      <div class="callout">
+        <strong>Al firmar:</strong> <code>JcaX509v3CertificateBuilder</code> construye un <code>TBSCertificate</code> ASN.1, <code>JcaContentSignerBuilder</code> lo firma produciendo un <code>Certificate</code> ASN.1 completo codificado en DER. DSS construye el <code>CMSSignedData</code> ASN.1 con el <code>SignerInfo</code> y lo codifica en DER para escribirlo en <code>/Contents</code>.<br><br>
+        <strong>Al verificar:</strong> BouncyCastle parsea los bytes DER de <code>/Contents</code> de vuelta a un árbol ASN.1 en memoria (<code>CMSSignedData</code>), extrae el <code>X509CertificateHolder</code> y el <code>SignerInfo</code>, y realiza la verificación sobre esas estructuras.
+      </div>
+    </section>
+
+    <!-- ══ BYTERANGE ══ -->
+    <section id="byterange" class="section">
+      <div class="section-hero">
+        <h1>El concepto de <em>ByteRange</em></h1>
+        <p>La parte más delicada del estándar PAdES. Es lo que permite detectar cualquier modificación post-firma.</p>
+      </div>
+
+      <p>Un PDF firmado tiene este aspecto en binario: el bloque <code>/Contents</code> contiene la firma DER (en rojo). El <strong>ByteRange</strong> describe los dos tramos que quedan fuera de ese bloque (en verde y azul) — y esos son exactamente los bytes que se firmaron.</p>
+
+      <div class="br-visual">
+        <div class="br-controls">
+          <span class="br-slider-label">Tamaño firma:</span>
+          <input type="range" class="br-slider" min="10" max="40" value="20" id="br-size" oninput="updateBR()">
+          <span class="br-slider-label">Posición:</span>
+          <input type="range" class="br-slider" min="20" max="60" value="40" id="br-pos" oninput="updateBR()">
+        </div>
+        <div class="br-track">
+          <div class="br-tramo1" id="br-t1"><span class="br-label" style="color:var(--green)">tramo1</span></div>
+          <div class="br-contents" id="br-c"><span class="br-label" style="color:var(--red)">/Contents</span></div>
+          <div class="br-tramo2" id="br-t2"><span class="br-label" style="color:var(--accent)">tramo2</span></div>
+        </div>
+        <div class="br-legend">
+          <div class="br-leg-item"><div class="br-leg-dot" style="background:rgba(62,207,142,.4);border:1px solid var(--green)"></div> Tramo 1 (firmado)</div>
+          <div class="br-leg-item"><div class="br-leg-dot" style="background:rgba(248,113,113,.3);border:1px solid var(--red)"></div> /Contents (excluido)</div>
+          <div class="br-leg-item"><div class="br-leg-dot" style="background:rgba(79,156,249,.3);border:1px solid var(--accent)"></div> Tramo 2 (firmado)</div>
+        </div>
+        <div class="br-desc" id="br-desc">ByteRange: [0, T1, T1+Contents, T2] — Los bytes firmados son tramo1 || tramo2.</div>
+      </div>
+
+      <h2>¿Por qué se excluye /Contents?</h2>
+      <p>Porque la firma en sí no puede estar dentro de lo que se firma — sería una referencia circular. DSS reserva un bloque de bytes fijo en el PDF (el <code>/Contents</code>), calcula la firma sobre todo lo demás, y luego escribe el resultado en ese bloque reservado.</p>
+
+      <div class="callout warn">
+        PDFBox 2.x calcula los offsets del ByteRange <em>antes</em> de serializar el xref, lo que provoca una desalineación de 1-4 bytes. Adobe Acrobat detecta esto y muestra "ByteRange invalid". Por eso DSS 6.x <strong>requiere PDFBox 3.x</strong>.
+      </div>
+
+      <h2>Cómo lo lee ByteRangeExtractor</h2>
+      <p>Usa PDFBox para obtener el array <code>/ByteRange</code> del diccionario de firma. Los 4 valores son <code>[offset1, longitud1, offset2, longitud2]</code>. Con ellos:</p>
+      <div class="callout">
+        1. Ensambla <code>contenidoFirmado = bytes[offset1..offset1+longitud1] + bytes[offset2..offset2+longitud2]</code><br>
+        2. Extrae el DER de <code>/Contents</code> (los bytes omitidos)<br>
+        3. Valida que <code>offset1 == 0</code> y <code>offset2 + longitud2 == tamaño total del PDF</code>
+      </div>
+    </section>
+
+    <!-- ══ ALGORITMOS ══ -->
+    <section id="algoritmos" class="section">
+      <div class="section-hero">
+        <h1>Algoritmos de <em>firma</em></h1>
+        <p>SecureSign soporta dos familias de curvas elípticas modernas.</p>
+      </div>
+
+      <div class="algo-grid">
+        <div class="algo-card">
+          <div class="algo-name">EC · <span>secp256r1</span></div>
+          <div class="algo-row"><span class="akey">Alias API</span><span class="aval">"EC" (default)</span></div>
+          <div class="algo-row"><span class="akey">Curva</span><span class="aval">P-256 / secp256r1</span></div>
+          <div class="algo-row"><span class="akey">Algo. JCA</span><span class="aval">SHA256withECDSA</span></div>
+          <div class="algo-row"><span class="akey">Hash</span><span class="aval">SHA-256 externo</span></div>
+          <div class="algo-row"><span class="akey">DigestAlg DSS</span><span class="aval">SHA256</span></div>
+          <div class="algo-row"><span class="akey">OID</span><span class="aval">1.2.840.10045.4.3.2</span></div>
+          <div class="algo-row"><span class="akey">Nivel PAdES</span><span class="aval">Baseline-B</span></div>
+        </div>
+        <div class="algo-card">
+          <div class="algo-name">Ed<span>25519</span></div>
+          <div class="algo-row"><span class="akey">Alias API</span><span class="aval">"Ed25519"</span></div>
+          <div class="algo-row"><span class="akey">Curva</span><span class="aval">Curve25519 (Edwards)</span></div>
+          <div class="algo-row"><span class="akey">Algo. JCA</span><span class="aval">Ed25519</span></div>
+          <div class="algo-row"><span class="akey">Hash</span><span class="aval">SHA-512 interno</span></div>
+          <div class="algo-row"><span class="akey">DigestAlg DSS</span><span class="aval">SHA512</span></div>
+          <div class="algo-row"><span class="akey">OID</span><span class="aval">1.3.101.112</span></div>
+          <div class="algo-row"><span class="akey">Nivel PAdES</span><span class="aval">Baseline-B</span></div>
+        </div>
+      </div>
+
+      <div class="callout">
+        <strong>¿Por qué ECDSA necesita especificar el hash y Ed25519 no?</strong><br>
+        ECDSA solo firma valores hash — nunca datos crudos. Por eso el nombre JCA incluye el algoritmo de hash (<code>SHA256withECDSA</code>). Ed25519 hace el hash internamente (SHA-512), así que su nombre JCA no lo menciona.
+      </div>
+
+      <h2>¿Por qué un par de claves nuevo por cada firma?</h2>
+      <p>Cada llamada a <code>/sign</code> genera un UUID como alias y crea un par de claves nuevo que se persiste en el <code>securesign.p12</code>. El certificado autofirmado asociado se incrusta en el PDF. Así, la verificación no necesita ningún lookup externo: toda la criptografía necesaria está en el propio archivo.</p>
+
+      <h2>Certificado X.509 generado</h2>
+      <table class="data-table">
+        <thead><tr><th>Campo</th><th>Valor</th></tr></thead>
+        <tbody>
+          <tr><td>Subject / Issuer</td><td>CN=SecureSign Institucional, O=Universidad, C=PE</td></tr>
+          <tr><td>Validez</td><td>365 días desde la emisión</td></tr>
+          <tr><td>KeyUsage</td><td>digitalSignature + nonRepudiation</td></tr>
+          <tr><td>BasicConstraints</td><td>CA:false</td></tr>
+          <tr><td>Número de serie</td><td>128 bits aleatorios (SecureRandom)</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ══ CMS ══ -->
+    <section id="cms" class="section">
+      <div class="section-hero">
+        <h1>CMS — <em>Cryptographic Message Syntax</em></h1>
+        <p>El estándar que define cómo empaquetar una firma digital junto con el certificado del firmante. Es el corazón del bloque <code>/Contents</code> en un PDF firmado.</p>
+      </div>
+
+      <h2>¿Qué es CMS?</h2>
+      <p>CMS (RFC 5652, antes PKCS#7) es un formato ASN.1 que describe cómo envolver datos criptográficos —firmas, claves cifradas, datos autenticados— en una estructura portable. En PAdES, el tipo concreto que se usa es <strong>SignedData</strong>: un sobre que contiene el valor de la firma, los atributos firmados, y los certificados X.509 del firmante.</p>
+
+      <div class="callout">
+        CMS <strong>no contiene el documento</strong> en sí. En PAdES el packaging es <em>ENVELOPED</em>: los bytes del PDF son externos y referenciados por el ByteRange. El bloque <code>/Contents</code> solo guarda el CMS, que a su vez guarda la firma de esos bytes externos.
+      </div>
+
+      <h2>Estructura de un CMSSignedData</h2>
+      <table class="data-table">
+        <thead><tr><th>Campo ASN.1</th><th>Contenido</th></tr></thead>
+        <tbody>
+          <tr><td>version</td><td>Versión del formato. PAdES usa v1 o v3.</td></tr>
+          <tr><td>digestAlgorithms</td><td>Set de OIDs de los algoritmos de hash usados (p.ej. SHA-256).</td></tr>
+          <tr><td>encapContentInfo</td><td>Tipo de contenido. En PAdES es <code>id-data</code> con contenido ausente (los datos están fuera).</td></tr>
+          <tr><td>certificates [0]</td><td>Set IMPLÍCITO con los certificados X.509 del firmante (y opcionalmente la cadena de confianza).</td></tr>
+          <tr><td>signerInfos</td><td>Set de <code>SignerInfo</code>: uno por cada firmante. Aquí está el valor de la firma propiamente dicho.</td></tr>
+        </tbody>
+      </table>
+
+      <h2>¿Qué es un SignerInfo?</h2>
+      <p>Cada <code>SignerInfo</code> dentro del CMS identifica al firmante y guarda el valor criptográfico de la firma:</p>
+      <table class="data-table">
+        <thead><tr><th>Campo</th><th>Significado</th></tr></thead>
+        <tbody>
+          <tr><td>sid</td><td>Identificador del firmante: puede ser Issuer+SerialNumber o SubjectKeyIdentifier.</td></tr>
+          <tr><td>digestAlgorithm</td><td>OID del hash usado sobre los bytes del documento.</td></tr>
+          <tr><td>signedAttrs</td><td>Atributos firmados: incluyen el hash del contenido (<code>message-digest</code>) y la fecha de firma (<code>signing-time</code>).</td></tr>
+          <tr><td>signatureAlgorithm</td><td>OID del algoritmo de firma: <code>SHA256withECDSA</code>, <code>Ed25519</code>, etc.</td></tr>
+          <tr><td>signature</td><td>El valor binario de la firma. Para ECDSA es una estructura DER con dos enteros <em>r</em> y <em>s</em>.</td></tr>
+        </tbody>
+      </table>
+
+      <h2>CMS en SecureSign</h2>
+      <p><strong>Al firmar</strong>: DSS genera internamente el <code>CMSSignedData</code>, lo codifica en DER y lo escribe en el bloque <code>/Contents</code> del PDF. El contenedor incluye el certificado X.509 autofirmado generado por BouncyCastle.</p>
+      <p><strong>Al verificar</strong>: <code>ByteRangeExtractor</code> lee los bytes crudos de <code>/Contents</code> del PDF y los entrega a BouncyCastle, que los parsea con <code>new CMSSignedData(contentInfo)</code>. Desde ahí se extraen el certificado y el <code>SignerInfo</code> para realizar la verificación criptográfica.</p>
+
+      <div class="callout warn">
+        Si el bloque <code>/Contents</code> está truncado o la cabecera ASN.1 no cuadra con el tamaño real, BouncyCastle lanza una excepción en el parsing. SecureSign captura esto y devuelve <code>cmsParseable: false</code> con la razón del fallo.
+      </div>
+    </section>
+
+    <!-- ══ DER ══ -->
+    <section id="der" class="section">
+      <div class="section-hero">
+        <h1>DER — <em>Distinguished Encoding Rules</em></h1>
+        <p>La serialización binaria canónica de estructuras ASN.1. Todo certificado, firma CMS y clave pública que viaja en el PDF está codificado en DER.</p>
+      </div>
+
+      <h2>¿Qué es ASN.1?</h2>
+      <p>ASN.1 (Abstract Syntax Notation One) es un lenguaje de descripción de estructuras de datos independiente de la plataforma. Define tipos como <code>INTEGER</code>, <code>BIT STRING</code>, <code>SEQUENCE</code>, <code>SET</code>, <code>OID</code>. Los estándares criptográficos (X.509, CMS, PKCS) describen sus estructuras en ASN.1.</p>
+
+      <h2>Reglas de codificación: BER, DER, PEM</h2>
+      <table class="data-table">
+        <thead><tr><th>Formato</th><th>Descripción</th><th>Uso en SecureSign</th></tr></thead>
+        <tbody>
+          <tr><td>BER</td><td>Basic Encoding Rules. Permite múltiples formas de codificar el mismo valor (longitud indefinida, etc.).</td><td>No se usa directamente.</td></tr>
+          <tr><td>DER</td><td>Distinguished Encoding Rules. Subconjunto <em>estricto</em> de BER: cada valor tiene una única representación binaria posible. Obligatorio en firmas y certificados.</td><td>Formato del bloque <code>/Contents</code> y de los certificados internos.</td></tr>
+          <tr><td>PEM</td><td>DER codificado en Base64 con cabeceras <code>-----BEGIN ...-----</code>. Formato de texto para intercambio.</td><td>No aparece en el PDF, pero puede usarse para exportar certificados.</td></tr>
+        </tbody>
+      </table>
+
+      <h2>Estructura TLV</h2>
+      <p>DER usa el esquema <strong>TLV</strong> (Tag–Length–Value). Cada elemento tiene: un byte de tipo (<em>tag</em>), uno o más bytes de longitud, y el contenido.</p>
+      <div class="callout">
+        Ejemplo: el byte <code>0x30</code> es el tag de <code>SEQUENCE</code>. Le sigue la longitud total de sus hijos, y luego los hijos anidados. Así se construye todo el árbol del certificado o del CMS.
+      </div>
+
+      <h2>¿Por qué DER y no BER?</h2>
+      <p>Las firmas digitales calculan un hash sobre los bytes exactos del CMS. Si hubiera más de una representación válida (como permite BER), el hash sería diferente dependiendo del encoder, y la verificación fallaría en implementaciones distintas. DER garantiza que todos los encoders producen exactamente los mismos bytes — la representación es <strong>canónica</strong>.</p>
+
+      <h2>DER en SecureSign</h2>
+      <p>BouncyCastle usa DER en todos sus outputs: <code>X509Certificate.getEncoded()</code> devuelve DER, <code>CMSSignedData.getEncoded()</code> devuelve DER. <code>ByteRangeExtractor</code> lee los bytes de <code>/Contents</code> como DER crudo y los pasa directamente al parser de BouncyCastle sin transformación intermedia.</p>
+
+      <div class="callout ok">
+        Los 4 valores del <code>/ByteRange</code> apuntan a offsets de bytes en el archivo PDF binario. El <code>/Contents</code> en el PDF está representado en <strong>hexadecimal ASCII</strong> (no DER directo). <code>ByteRangeExtractor</code> convierte esa cadena hex a bytes antes de pasarla a BouncyCastle.
+      </div>
+    </section>
+
+    <!-- ══ X.509 ══ -->
+    <section id="x509" class="section">
+      <div class="section-hero">
+        <h1>Certificado <em>X.509</em></h1>
+        <p>El documento digital que vincula una clave pública con una identidad. En SecureSign, cada firma lleva su propio certificado autofirmado embebido en el PDF.</p>
+      </div>
+
+      <h2>¿Qué es un certificado X.509?</h2>
+      <p>Un certificado X.509 (estándar ITU-T X.509 / RFC 5280) es una estructura ASN.1 firmada digitalmente que asocia una <strong>clave pública</strong> con un <strong>sujeto</strong> (una entidad: persona, servidor, organización) durante un periodo de validez. La versión 3 (X.509v3) añade extensiones que permiten definir restricciones de uso, identificadores de clave y políticas.</p>
+
+      <h2>Campos del certificado</h2>
+      <table class="data-table">
+        <thead><tr><th>Campo</th><th>Descripción</th><th>Valor en SecureSign</th></tr></thead>
+        <tbody>
+          <tr><td>version</td><td>Versión del estándar.</td><td>v3 (entero 2)</td></tr>
+          <tr><td>serialNumber</td><td>Número único dentro del emisor.</td><td>128 bits aleatorios (<code>SecureRandom</code>)</td></tr>
+          <tr><td>issuer</td><td>Distinguished Name del emisor.</td><td><code>CN=SecureSign Institucional, O=Universidad, C=PE</code></td></tr>
+          <tr><td>validity.notBefore</td><td>Inicio de validez.</td><td>1 minuto antes de la emisión (skew)</td></tr>
+          <tr><td>validity.notAfter</td><td>Fin de validez.</td><td>365 días después de la emisión</td></tr>
+          <tr><td>subject</td><td>Distinguished Name del titular.</td><td>Igual que issuer (autofirmado)</td></tr>
+          <tr><td>subjectPublicKeyInfo</td><td>Clave pública + OID del algoritmo.</td><td>EC secp256r1 o Ed25519</td></tr>
+          <tr><td>signature</td><td>Firma del emisor sobre el TBSCertificate.</td><td>Firmado con la propia clave privada</td></tr>
+        </tbody>
+      </table>
+
+      <h2>Extensiones X.509v3 que genera SecureSign</h2>
+      <table class="data-table">
+        <thead><tr><th>Extensión</th><th>Crítica</th><th>Valor</th><th>Propósito</th></tr></thead>
+        <tbody>
+          <tr><td>SubjectKeyIdentifier</td><td>No</td><td>Hash SHA-1 de la clave pública</td><td>Permite referenciar la clave sin repetir todo el certificado.</td></tr>
+          <tr><td>AuthorityKeyIdentifier</td><td>No</td><td>Mismo hash (autofirmado)</td><td>Enlaza el cert con su emisor. Útil en cadenas de confianza.</td></tr>
+          <tr><td>KeyUsage</td><td>Sí</td><td><code>digitalSignature | nonRepudiation</code></td><td>Restringe el uso de la clave a firma y no repudio.</td></tr>
+          <tr><td>BasicConstraints</td><td>Sí</td><td><code>CA:false</code></td><td>Declara que este certificado no puede firmar otros certificados (no es una CA).</td></tr>
+        </tbody>
+      </table>
+
+      <h2>Certificado autofirmado vs. CA</h2>
+      <p>En un PKI real, el certificado del firmante estaría emitido por una CA de confianza (como la SUNAT, el RENIEC o una CA privada corporativa). En SecureSign, el Subject y el Issuer son el mismo — el certificado se firma con su propia clave privada. Esto es suficiente para demostrar integridad del documento (el hash no cambió), pero <strong>no</strong> ofrece garantía de identidad externa.</p>
+
+      <div class="callout warn">
+        Lectores PDF como Adobe Acrobat mostrarán "firma válida" pero "certificado no de confianza" porque el certificado autofirmado no está en su almacén de CAs raíz. Para uso productivo habría que usar un certificado emitido por una CA reconocida.
+      </div>
+
+      <h2>Ciclo de vida en SecureSign</h2>
+      <p><code>CertificateX509Service.generarCertificadoX509(keyPair, algorithm)</code> construye el certificado con <code>JcaX509v3CertificateBuilder</code>, le añade las extensiones y lo firma con <code>JcaContentSignerBuilder</code>. El resultado es un <code>X509Certificate</code> Java estándar que se almacena en el PKCS#12 junto a la clave privada. Al firmar el PDF, DSS lo incrusta en el bloque CMS dentro de <code>/Contents</code>. Al verificar, BouncyCastle lo extrae con <code>JcaX509CertificateConverter</code> y comprueba su vigencia.</p>
+    </section>
+
+    <!-- ══ RESPUESTA ══ -->
+    <section id="respuesta" class="section">
+      <div class="section-hero">
+        <h1>Respuesta JSON de <em>verificación</em></h1>
+        <p>El endpoint <code>/verify</code> devuelve un objeto con 12 campos que describen cada capa de la verificación.</p>
+      </div>
+
+      <div class="resp-grid">
+        <div class="resp-card ok">
+          <div class="rname">valid</div>
+          <div class="rdesc">Resultado final. <code>true</code> solo si firmaValida && certificadoVigente.</div>
+        </div>
+        <div class="resp-card">
+          <div class="rname">firmaExtraible</div>
+          <div class="rdesc">Se encontró y extrajo el bloque /Contents del PDF. Falla si el PDF no está firmado.</div>
+        </div>
+        <div class="resp-card">
+          <div class="rname">byteRangeValido</div>
+          <div class="rdesc">El /ByteRange cubre exactamente los bytes fuera del bloque de firma. Detecta PDFs firmados con PDFBox 2.x.</div>
+        </div>
+        <div class="resp-card">
+          <div class="rname">cmsParseable</div>
+          <div class="rdesc">El DER en /Contents es un CMSSignedData estructuralmente válido.</div>
+        </div>
+        <div class="resp-card">
+          <div class="rname">certificadoExtraible</div>
+          <div class="rdesc">El CMS contiene al menos un certificado X.509 embebido.</div>
+        </div>
+        <div class="resp-card ok">
+          <div class="rname">firmaValida</div>
+          <div class="rdesc">Hash recalculado del doc coincide con el valor de firma. Cualquier cambio post-firma lo rompe.</div>
+        </div>
+        <div class="resp-card ok">
+          <div class="rname">certificadoVigente</div>
+          <div class="rdesc">La fecha actual está entre notBefore y notAfter del certificado (validez: 365 días).</div>
+        </div>
+        <div class="resp-card">
+          <div class="rname">algoritmoFirma</div>
+          <div class="rdesc">OID resuelto a nombre legible: SHA256withECDSA, Ed25519, SHA512withECDSA…</div>
+        </div>
+        <div class="resp-card">
+          <div class="rname">subject</div>
+          <div class="rdesc">"CN=SecureSign Institucional, O=Universidad, C=PE"</div>
+        </div>
+        <div class="resp-card">
+          <div class="rname">validoDesde / validoHasta</div>
+          <div class="rdesc">Ventana de validez del certificado en ISO-8601 UTC.</div>
+        </div>
+        <div class="resp-card warn">
+          <div class="rname">razon</div>
+          <div class="rdesc"><code>null</code> si todo fue bien. Mensaje descriptivo del fallo en caso contrario.</div>
+        </div>
+      </div>
+
+      <hr class="divider">
+      <h2>Estados posibles</h2>
+
+      <div class="matrix">
+        <div class="matrix-row matrix-header">
+          <div class="matrix-situation">Situación</div>
+          <div class="matrix-cell">valid</div>
+          <div class="matrix-cell">firmaValida</div>
+          <div class="matrix-cell">certVigente</div>
+          <div class="matrix-reason">razon</div>
+        </div>
+        <div class="matrix-row">
+          <div class="matrix-situation"><span class="pill pill-green">OK</span> PDF correcto</div>
+          <div class="matrix-cell ok-val">true</div>
+          <div class="matrix-cell ok-val">true</div>
+          <div class="matrix-cell ok-val">true</div>
+          <div class="matrix-reason">null</div>
+        </div>
+        <div class="matrix-row">
+          <div class="matrix-situation"><span class="pill pill-red">ERR</span> PDF modificado</div>
+          <div class="matrix-cell bad-val">false</div>
+          <div class="matrix-cell bad-val">false</div>
+          <div class="matrix-cell ok-val">true</div>
+          <div class="matrix-reason">"El hash no coincide…"</div>
+        </div>
+        <div class="matrix-row">
+          <div class="matrix-situation"><span class="pill pill-amber">WARN</span> Cert expirado</div>
+          <div class="matrix-cell bad-val">false</div>
+          <div class="matrix-cell ok-val">true</div>
+          <div class="matrix-cell bad-val">false</div>
+          <div class="matrix-reason">"El certificado ha expirado…"</div>
+        </div>
+        <div class="matrix-row">
+          <div class="matrix-situation"><span class="pill pill-red">ERR</span> Sin firma</div>
+          <div class="matrix-cell bad-val">false</div>
+          <div class="matrix-cell bad-val">false</div>
+          <div class="matrix-cell bad-val">false</div>
+          <div class="matrix-reason">"El PDF no contiene firma…"</div>
+        </div>
+        <div class="matrix-row">
+          <div class="matrix-situation"><span class="pill pill-red">ERR</span> CMS corrupto</div>
+          <div class="matrix-cell bad-val">false</div>
+          <div class="matrix-cell bad-val">false</div>
+          <div class="matrix-cell bad-val">false</div>
+          <div class="matrix-reason">"El bloque CMS está corrupto…"</div>
+        </div>
+      </div>
+
+      <div class="callout ok" style="margin-top:24px">
+        <strong>valid = firmaValida && certificadoVigente</strong><br>
+        Es perfectamente posible que la firma sea criptográficamente válida pero el certificado esté expirado (los certs duran 365 días). En ese caso la firma demuestra que el documento no fue alterado, pero el certificado ya no está en vigor — por eso <code>valid</code> es <code>false</code>.
+      </div>
+    </section>
+
+    <!-- ══ LIB DSS ══ -->
+    <section id="lib-dss" class="section">
+      <div class="section-hero">
+        <h1>EU DSS — <em>Digital Signature Service</em></h1>
+        <p>Librería open-source de la Unión Europea para crear y validar firmas digitales conformes a los estándares eIDAS. Es el motor principal de firma en SecureSign.</p>
+      </div>
+
+      <h2>¿Qué es EU DSS?</h2>
+      <p>DSS (Digital Signature Service) es una librería Java mantenida por la Comisión Europea bajo la <a href="https://joinup.ec.europa.eu/solution/digital-signature-services" style="color:var(--accent)">iniciativa DIGIT</a>. Implementa los perfiles de firma electrónica exigidos por el reglamento eIDAS: <strong>PAdES</strong> (PDF), XAdES (XML) y CAdES (binario). Su objetivo es que cualquier estado miembro de la UE pueda crear y validar firmas jurídicamente vinculantes.</p>
+
+      <div class="callout">
+        DSS no es solo una librería de firma: incluye validación de cadenas de confianza, consulta de listas de revocación (CRL/OCSP), soporte para marcas de tiempo (TSA) y perfiles avanzados Long-Term (LT) y Archival (LTA). SecureSign usa solo el nivel más básico, <strong>Baseline-B</strong>.
+      </div>
+
+      <h2>Versión usada</h2>
+      <table class="data-table">
+        <thead><tr><th>Dato</th><th>Valor</th></tr></thead>
+        <tbody>
+          <tr><td>Versión</td><td><strong>6.4</strong> (última estable al momento del desarrollo)</td></tr>
+          <tr><td>Group ID</td><td><code>eu.europa.ec.joinup.sd-dss</code></td></tr>
+          <tr><td>Repositorio</td><td>Maven Central + repositorio oficial de la CE</td></tr>
+          <tr><td>Licencia</td><td>LGPL 2.1</td></tr>
+          <tr><td>Requiere PDFBox</td><td>3.x (incompatible con PDFBox 2.x en esta versión)</td></tr>
+        </tbody>
+      </table>
+
+      <h2>Módulos de DSS que usa SecureSign</h2>
+      <table class="data-table">
+        <thead><tr><th>Artefacto Maven</th><th>Función</th></tr></thead>
+        <tbody>
+          <tr><td><code>dss-pades</code></td><td>Implementación de firma y validación PAdES. Contiene <code>PAdESService</code> y <code>PAdESSignatureParameters</code>.</td></tr>
+          <tr><td><code>dss-pades-pdfbox</code></td><td>Adaptador que integra PDFBox 3.x como backend PDF para las operaciones de DSS.</td></tr>
+          <tr><td><code>dss-token</code></td><td>Abstracción de tokens criptográficos. <code>KeyStoreSignatureTokenConnection</code> permite usar un archivo PKCS#12 como fuente de claves.</td></tr>
+          <tr><td><code>dss-bom</code></td><td>BOM (Bill of Materials) que gestiona las versiones consistentes de todos los módulos DSS y sus dependencias transitivas (incluido BouncyCastle).</td></tr>
+        </tbody>
+      </table>
+
+      <h2>Responsabilidades concretas de DSS en SecureSign</h2>
+      <p>En <code>SignatureService.firmarPdf()</code>:</p>
+      <table class="data-table">
+        <thead><tr><th>Paso</th><th>Clase DSS</th><th>Qué hace</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td><code>PAdESSignatureParameters</code></td><td>Configura el nivel (Baseline-B), el packaging (ENVELOPED), el certificado, la cadena de confianza y el DigestAlgorithm.</td></tr>
+          <tr><td>2</td><td><code>PAdESService.getDataToSign(doc, params)</code></td><td>Prepara el PDF (reserva el bloque /Contents, escribe el /ByteRange) y devuelve los bytes que deben firmarse.</td></tr>
+          <tr><td>3</td><td><code>KeyStoreSignatureTokenConnection.sign(dataToSign, algo, key)</code></td><td>Firma los bytes usando la clave privada del PKCS#12.</td></tr>
+          <tr><td>4</td><td><code>PAdESService.signDocument(doc, params, signatureValue)</code></td><td>Ensambla el CMS final (con cert embebido), lo codifica en DER y lo escribe en el bloque /Contents del PDF.</td></tr>
+        </tbody>
+      </table>
+
+      <h2>Niveles PAdES soportados por DSS</h2>
+      <table class="data-table">
+        <thead><tr><th>Nivel</th><th>Descripción</th><th>¿Lo usa SecureSign?</th></tr></thead>
+        <tbody>
+          <tr><td>Baseline-B</td><td>Firma básica con certificado embebido. Sin sello de tiempo ni CRL.</td><td><span class="pill pill-green">Sí</span></td></tr>
+          <tr><td>Baseline-T</td><td>Añade sello de tiempo de una TSA sobre la firma.</td><td><span class="pill pill-red">No</span></td></tr>
+          <tr><td>Baseline-LT</td><td>Incluye datos de revocación (CRL/OCSP) para validación offline.</td><td><span class="pill pill-red">No</span></td></tr>
+          <tr><td>Baseline-LTA</td><td>Archival: múltiples sellos de tiempo para validez a largo plazo.</td><td><span class="pill pill-red">No</span></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ══ LIB PDFBOX ══ -->
+    <section id="lib-pdfbox" class="section">
+      <div class="section-hero">
+        <h1>Apache <em>PDFBox</em></h1>
+        <p>Librería Java open-source de Apache para leer, escribir y manipular documentos PDF. En SecureSign es el backend PDF que DSS usa internamente y el motor de extracción del ByteRange.</p>
+      </div>
+
+      <h2>¿Qué es Apache PDFBox?</h2>
+      <p>PDFBox es una librería Java mantenida por la Apache Software Foundation que implementa el estándar PDF a bajo nivel: parsing del formato binario, manipulación del árbol de objetos COS, renderizado de páginas y soporte para firmas digitales. Es la librería PDF Java de referencia en el ecosistema open-source.</p>
+
+      <h2>Versión usada y por qué importa</h2>
+      <table class="data-table">
+        <thead><tr><th>Dato</th><th>Valor</th></tr></thead>
+        <tbody>
+          <tr><td>Versión</td><td><strong>3.0.3</strong></td></tr>
+          <tr><td>Group ID</td><td><code>org.apache.pdfbox</code></td></tr>
+          <tr><td>Artefacto</td><td><code>pdfbox</code></td></tr>
+          <tr><td>Licencia</td><td>Apache License 2.0</td></tr>
+        </tbody>
+      </table>
+
+      <div class="callout warn">
+        <strong>PDFBox 2.x es incompatible con DSS 6.x.</strong> En la versión 2, los offsets del ByteRange se calculan antes de serializar la tabla xref, produciendo una desalineación de 1–4 bytes. DSS 6.x detecta esto y lanza una excepción. La versión 3.x corrige el cálculo de offsets y es la única compatible con DSS 6.4.
+      </div>
+
+      <h2>Usos de PDFBox en SecureSign</h2>
+      <table class="data-table">
+        <thead><tr><th>Dónde</th><th>Qué usa</th><th>Para qué</th></tr></thead>
+        <tbody>
+          <tr><td><code>ByteRangeExtractor</code></td><td><code>PDDocument.load(bytes)</code></td><td>Carga el PDF en memoria desde un array de bytes.</td></tr>
+          <tr><td><code>ByteRangeExtractor</code></td><td><code>doc.getSignatureDictionaries()</code></td><td>Obtiene la lista de <code>PDSignature</code> del PDF.</td></tr>
+          <tr><td><code>ByteRangeExtractor</code></td><td><code>sig.getByteRange()</code></td><td>Lee el array <code>/ByteRange</code> como <code>int[]</code>.</td></tr>
+          <tr><td><code>ByteRangeExtractor</code></td><td><code>sig.getContents(originalBytes)</code></td><td>Extrae el bloque <code>/Contents</code> como bytes DER crudos.</td></tr>
+          <tr><td><code>SignatureService</code> (vía DSS)</td><td><code>PDFBoxNativeObjectFactory</code></td><td>DSS usa internamente PDFBox 3.x para escribir el PDF firmado.</td></tr>
+        </tbody>
+      </table>
+
+      <h2>Diferencia entre PDFBox 2.x y 3.x relevante para firmas</h2>
+      <table class="data-table">
+        <thead><tr><th>Aspecto</th><th>PDFBox 2.x</th><th>PDFBox 3.x</th></tr></thead>
+        <tbody>
+          <tr><td>Cálculo de offsets ByteRange</td><td>Antes de escribir xref → desalineación</td><td>Después de escribir xref → correcto</td></tr>
+          <tr><td>API de firma</td><td><code>SignatureInterface</code> (callback)</td><td>Mismo + nuevas APIs de preprocesado</td></tr>
+          <tr><td>Compatibilidad con DSS 6.x</td><td><span class="pill pill-red">Incompatible</span></td><td><span class="pill pill-green">Requerida</span></td></tr>
+          <tr><td>Compatibilidad con Adobe Acrobat</td><td>ByteRange inválido en algunos PDFs</td><td>Correcto</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ══ LIB BC ══ -->
+    <section id="lib-bc" class="section">
+      <div class="section-hero">
+        <h1>Bouncy <em>Castle</em></h1>
+        <p>La librería criptográfica Java de referencia. En SecureSign se encarga de emitir certificados X.509, parsear el CMS y verificar las firmas.</p>
+      </div>
+
+      <h2>¿Qué es Bouncy Castle?</h2>
+      <p>Bouncy Castle (BC) es un proveedor criptográfico Java open-source mantenido por la Legion of the Bouncy Castle Inc. Implementa una cantidad enorme de algoritmos, estándares y estructuras: desde AES y RSA hasta curvas elípticas, ASN.1, X.509, CMS/PKCS#7, PKCS#10, OpenPGP y mucho más. Es el complemento habitual de la JCA (Java Cryptography Architecture) cuando se necesitan primitivas avanzadas que el JDK no trae por defecto.</p>
+
+      <h2>Versión usada</h2>
+      <p>SecureSign no fija la versión de BouncyCastle directamente — la versión la gestiona el BOM de DSS 6.4 (<code>dss-bom</code>), que declara la versión de BC compatible y la inyecta como dependencia transitiva. Esto garantiza que BC y DSS están coordinados y evita conflictos de versión.</p>
+
+      <table class="data-table">
+        <thead><tr><th>Artefacto</th><th>Group ID</th><th>Uso</th></tr></thead>
+        <tbody>
+          <tr><td><code>bcprov-jdk18on</code></td><td><code>org.bouncycastle</code></td><td>Proveedor JCE: algoritmos de cifrado, curvas elípticas, hashes.</td></tr>
+          <tr><td><code>bcpkix-jdk18on</code></td><td><code>org.bouncycastle</code></td><td>PKI: X.509, CMS, PKCS#10, OCSP. Las clases que usa SecureSign para emitir certs y parsear CMS están aquí.</td></tr>
+        </tbody>
+      </table>
+
+      <h2>Usos concretos en SecureSign</h2>
+      <table class="data-table">
+        <thead><tr><th>Clase BC</th><th>Dónde se usa</th><th>Para qué</th></tr></thead>
+        <tbody>
+          <tr><td><code>JcaX509v3CertificateBuilder</code></td><td><code>CertificateX509Service</code></td><td>Construye el TBSCertificate con subject, validity, publicKey y extensiones.</td></tr>
+          <tr><td><code>JcaContentSignerBuilder</code></td><td><code>CertificateX509Service</code></td><td>Firma el TBSCertificate con la clave privada para producir el certificado final.</td></tr>
+          <tr><td><code>JcaX509CertificateConverter</code></td><td><code>VerificationService</code></td><td>Convierte un <code>X509CertificateHolder</code> (formato BC) a <code>X509Certificate</code> (formato JCA estándar).</td></tr>
+          <tr><td><code>CMSSignedData</code></td><td><code>VerificationService</code></td><td>Parsea los bytes DER de <code>/Contents</code> como un objeto CMS manipulable.</td></tr>
+          <tr><td><code>SignerInformationStore</code></td><td><code>VerificationService</code></td><td>Itera sobre los <code>SignerInfo</code> del CMS para encontrar el que corresponde al certificado extraído.</td></tr>
+          <tr><td><code>JcaSimpleSignerInfoVerifierBuilder</code></td><td><code>VerificationService</code></td><td>Construye el verificador que compara el hash del documento contra el valor de firma del <code>SignerInfo</code>.</td></tr>
+          <tr><td><code>Extensions</code> + <code>KeyUsage</code></td><td><code>CertificateX509Service</code></td><td>Añade las extensiones X.509v3 al certificado (KeyUsage, BasicConstraints, SKI, AKI).</td></tr>
+        </tbody>
+      </table>
+
+      <div class="callout">
+        BouncyCastle debe registrarse como proveedor JCE con <code>Security.addProvider(new BouncyCastleProvider())</code>. En SecureSign esto se hace en el constructor de <code>CertificateX509Service</code> con la anotación <code>@PostConstruct</code> de Spring.
+      </div>
+    </section>
+
+    <!-- ══ LIB OTRAS ══ -->
+    <section id="lib-otras" class="section">
+      <div class="section-hero">
+        <h1>Otras <em>dependencias</em></h1>
+        <p>El resto del stack: Spring Boot, PKCS#12 del JDK y el BOM de DSS que orquesta las versiones.</p>
+      </div>
+
+      <h2>Spring Boot 4</h2>
+      <table class="data-table">
+        <thead><tr><th>Aspecto</th><th>Detalle</th></tr></thead>
+        <tbody>
+          <tr><td>Versión</td><td>4.0.6 (requiere Java 17+)</td></tr>
+          <tr><td>Rol principal</td><td>Framework HTTP y contenedor IoC (Inversión de Control / Inyección de Dependencias).</td></tr>
+          <tr><td><code>@RestController</code></td><td>Marca <code>DocumentController</code> como controlador HTTP que serializa respuestas a JSON/bytes automáticamente.</td></tr>
+          <tr><td><code>@PostMapping</code></td><td>Mapea rutas HTTP POST a métodos Java.</td></tr>
+          <tr><td><code>@RequestParam</code></td><td>Extrae parámetros de formulario multipart (el <code>MultipartFile</code> y el <code>algorithm</code>).</td></tr>
+          <tr><td><code>@Service</code>, <code>@Component</code></td><td>Declara beans gestionados por Spring. Spring resuelve las dependencias entre servicios automáticamente.</td></tr>
+          <tr><td><code>@Value</code></td><td>Inyecta valores de <code>application.properties</code> (ruta del PKCS#12, contraseña).</td></tr>
+          <tr><td>Jackson</td><td>Incluido por defecto. Serializa los Java records de respuesta a JSON sin configuración adicional.</td></tr>
+        </tbody>
+      </table>
+
+      <h2>PKCS#12 (JDK nativo)</h2>
+      <table class="data-table">
+        <thead><tr><th>Aspecto</th><th>Detalle</th></tr></thead>
+        <tbody>
+          <tr><td>Qué es</td><td>Formato de archivo binario (extensión <code>.p12</code> o <code>.pfx</code>) que almacena claves privadas y certificados protegidos por contraseña.</td></tr>
+          <tr><td>API usada</td><td><code>KeyStore.getInstance("PKCS12")</code> del JDK estándar — no requiere BouncyCastle ni DSS.</td></tr>
+          <tr><td>Operaciones</td><td><code>keyStore.setKeyEntry(alias, privateKey, password, certChain)</code> para guardar. <code>keyStore.getKey(alias, password)</code> y <code>keyStore.getCertificate(alias)</code> para recuperar.</td></tr>
+          <tr><td>Archivo en disco</td><td><code>securesign.p12</code> — ruta configurable por <code>application.properties</code>.</td></tr>
+          <tr><td>Thread-safety</td><td><code>KeyStoreService.guardar()</code> es <code>synchronized</code> para evitar corrupción con peticiones concurrentes.</td></tr>
+        </tbody>
+      </table>
+
+      <h2>DSS BOM — gestión de versiones</h2>
+      <p>El artefacto <code>dss-bom</code> es un POM especial de Maven de tipo <code>import</code>. Declara las versiones de todos los módulos DSS y sus dependencias transitivas (BouncyCastle, PDFBox 3.x, etc.). Al importarlo con <code>&lt;scope&gt;import&lt;/scope&gt;</code> en el <code>dependencyManagement</code> del <code>pom.xml</code>, todas las versiones quedan fijadas y coherentes sin tener que declararlas explícitamente en cada artefacto.</p>
+
+      <div class="callout ok">
+        <strong>Orden de prioridad en el pom.xml:</strong> el BOM de DSS tiene precedencia sobre el BOM de Spring Boot para las dependencias compartidas (BouncyCastle). Esto es intencional: Spring Boot podría declarar una versión de BC más antigua; el BOM de DSS garantiza la versión compatible con las firmas PAdES.
+      </div>
+
+      <h2>Resumen de dependencias directas en pom.xml</h2>
+      <table class="data-table">
+        <thead><tr><th>Artefacto</th><th>Versión gestionada por</th><th>Rol</th></tr></thead>
+        <tbody>
+          <tr><td><code>dss-pades</code></td><td>dss-bom 6.4</td><td>Motor PAdES</td></tr>
+          <tr><td><code>dss-pades-pdfbox</code></td><td>dss-bom 6.4</td><td>Adaptador PDFBox 3 para DSS</td></tr>
+          <tr><td><code>dss-token</code></td><td>dss-bom 6.4</td><td>Conexión PKCS#12 para firmar</td></tr>
+          <tr><td><code>pdfbox</code></td><td>dss-bom 6.4 (transitiva)</td><td>Backend PDF</td></tr>
+          <tr><td><code>bcprov-jdk18on</code></td><td>dss-bom 6.4 (transitiva)</td><td>Algoritmos criptográficos</td></tr>
+          <tr><td><code>bcpkix-jdk18on</code></td><td>dss-bom 6.4 (transitiva)</td><td>PKI, CMS, X.509</td></tr>
+          <tr><td><code>spring-boot-starter-web</code></td><td>Spring Boot BOM 4.0.6</td><td>HTTP + Jackson JSON</td></tr>
+          <tr><td><code>spring-boot-starter-test</code></td><td>Spring Boot BOM 4.0.6</td><td>JUnit 5, MockMvc</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+  </main>
+</div>
+
+<!-- Mobile nav -->
+<div class="mobile-nav">
+  <button class="mob-btn active" onclick="showSection('overview')">General</button>
+  <button class="mob-btn" onclick="showSection('arquitectura')">Arquitectura</button>
+  <button class="mob-btn" onclick="showSection('flujo-firma')">Firmar</button>
+  <button class="mob-btn" onclick="showSection('flujo-verify')">Verificar</button>
+  <button class="mob-btn" onclick="showSection('pades')">PAdES</button>
+  <button class="mob-btn" onclick="showSection('pkcs12')">PKCS#12</button>
+  <button class="mob-btn" onclick="showSection('cos')">COS</button>
+  <button class="mob-btn" onclick="showSection('asn1')">ASN.1</button>
+  <button class="mob-btn" onclick="showSection('byterange')">ByteRange</button>
+  <button class="mob-btn" onclick="showSection('cms')">CMS</button>
+  <button class="mob-btn" onclick="showSection('der')">DER</button>
+  <button class="mob-btn" onclick="showSection('x509')">X.509</button>
+  <button class="mob-btn" onclick="showSection('algoritmos')">Algoritmos</button>
+  <button class="mob-btn" onclick="showSection('respuesta')">Respuesta</button>
+  <button class="mob-btn" onclick="showSection('lib-dss')">EU DSS</button>
+  <button class="mob-btn" onclick="showSection('lib-pdfbox')">PDFBox</button>
+  <button class="mob-btn" onclick="showSection('lib-bc')">BouncyCastle</button>
+  <button class="mob-btn" onclick="showSection('lib-otras')">Otras libs</button>
+</div>
+
+<script>
+// ── NAVEGACIÓN ──
+const sectionMap = {
+  'overview':      0,  'arquitectura':  1,
+  'flujo-firma':   2,  'flujo-verify':  3,
+  'pades':         4,  'pkcs12':        5,
+  'cos':           6,  'asn1':          7,
+  'byterange':     8,  'cms':           9,
+  'der':          10,  'x509':         11,
+  'algoritmos':   12,  'respuesta':    13,
+  'lib-dss':      14,  'lib-pdfbox':   15,
+  'lib-bc':       16,  'lib-otras':    17
+};
+
+function showSection(id) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.mob-btn').forEach(b => b.classList.remove('active'));
+
+  document.getElementById(id).classList.add('active');
+
+  const navItems = document.querySelectorAll('.nav-item');
+  const idx = sectionMap[id];
+  if (navItems[idx]) navItems[idx].classList.add('active');
+
+  const mobBtns = document.querySelectorAll('.mob-btn');
+  if (mobBtns[idx]) mobBtns[idx].classList.add('active');
+
+  window.scrollTo(0, 0);
+}
+
+// ── FLOW DETAILS ──
+const firmaDetails = {
+  http: {
+    title: 'POST /api/documents/sign',
+    body: 'El cliente envía un <code>multipart/form-data</code> con el campo <code>file</code> (el PDF a firmar) y opcionalmente <code>algorithm</code> (por defecto <code>EC</code>). Spring deserializa el <code>MultipartFile</code> automáticamente.',
+    tags: ['REST', 'multipart/form-data', 'Spring MVC']
+  },
+  ctrl: {
+    title: 'DocumentController.generate()',
+    body: 'Solo traduce HTTP a lógica de negocio. Extrae <code>file.getBytes()</code> y el parámetro <code>algorithm</code>, llama a <code>documentService.firmarDocumento()</code>, y construye la respuesta con los headers correctos: <code>Content-Type: application/pdf</code>, <code>Content-Disposition: attachment; filename="X_firmado.pdf"</code> y <code>Content-Length</code>.',
+    tags: ['@RestController', '@PostMapping', 'ResponseEntity']
+  },
+  docsvc: {
+    title: 'DocumentService.firmarDocumento()',
+    body: 'Servicio de fachada delgado. Coordina en tres pasos: (1) llama a <code>KeyManagementService.generarYAlmacenarParDeClaves(algorithm)</code> para obtener un alias UUID, (2) recupera el certificado X.509 de ese alias, (3) llama a <code>SignatureService.firmarPdf(bytes, cert, algorithm)</code> y devuelve el PDF firmado. No contiene lógica criptográfica propia.',
+    tags: ['@Service', 'Orquestador', 'Fachada']
+  },
+  keymgmt: {
+    title: 'KeyManagementService.generarYAlmacenarParDeClaves()',
+    body: 'Genera el par de claves con JCA: para <code>EC</code> usa <code>KeyPairGenerator("EC")</code> con <code>ECGenParameterSpec("secp256r1")</code>; para <code>Ed25519</code> usa <code>KeyPairGenerator("Ed25519")</code>. Luego pide a <code>CertificateX509Service</code> que emita un certificado X.509v3 autofirmado, asigna un <code>UUID</code> como alias y guarda la entrada en el KeyStore PKCS#12.',
+    tags: ['JCA', 'KeyPairGenerator', 'UUID alias']
+  },
+  keystore: {
+    title: 'KeyStoreService — persistencia PKCS#12',
+    body: 'Lee y escribe el archivo <code>securesign.p12</code> en disco. Si el archivo no existe al arrancar, lo crea vacío con <code>keyStore.load(null, password)</code>. El método <code>guardar()</code> es <code>synchronized</code> para evitar corrupción del archivo ante peticiones concurrentes. La contraseña viene de la variable de entorno <code>SECURESIGN_KEYSTORE_PASSWORD</code>.',
+    tags: ['PKCS#12', 'synchronized', 'Disco']
+  },
+  certx509: {
+    title: 'CertificateX509Service.generarCertificadoX509()',
+    body: 'Usa BouncyCastle (<code>JcaX509v3CertificateBuilder</code>) para emitir un certificado X.509v3 autofirmado. Le añade las extensiones estándar: <code>SubjectKeyIdentifier</code>, <code>AuthorityKeyIdentifier</code>, <code>KeyUsage</code> (digitalSignature | nonRepudiation) y <code>BasicConstraints(false)</code>. Validez: 1 minuto hacia atrás + 365 días hacia adelante. El Subject es siempre <em>CN=SecureSign Institucional, O=Universidad, C=PE</em>.',
+    tags: ['BouncyCastle', 'X.509v3', 'JcaX509v3CertificateBuilder']
+  },
+  sigsvc: {
+    title: 'SignatureService.firmarPdf()',
+    body: 'Abre una conexión al PKCS#12 con <code>KeyStoreSignatureTokenConnection</code> de DSS, configura <code>PAdESSignatureParameters</code> (nivel <code>PAdES_BASELINE_B</code>, packaging <code>ENVELOPED</code>, certificado + cadena, DigestAlgorithm según el algoritmo). Llama a <code>PAdESService.getDataToSign()</code> para obtener los bytes a firmar, firma con la clave privada mediante <code>conexionToken.sign()</code>, y finalmente llama a <code>signDocument()</code> que produce el PDF con la firma PAdES embebida usando PDFBox 3.x internamente.',
+    tags: ['DSS 6.4', 'PAdES_BASELINE_B', 'ENVELOPED', 'PDFBox 3.x']
+  },
+  resp: {
+    title: 'Respuesta — PDF firmado',
+    body: 'El endpoint devuelve el PDF con los bytes de la firma PAdES embebidos en el bloque <code>/Contents</code> del diccionario de firma interno del PDF. El archivo resultante es compatible con lectores PDF estándar (Adobe Acrobat, etc.). El nombre del archivo sigue el patrón <code>&lt;nombre-original&gt;_firmado.pdf</code>.',
+    tags: ['application/pdf', 'Content-Disposition', 'PAdES embebido']
+  }
+};
+
+const verifyDetails = {
+  http: {
+    title: 'POST /api/documents/verify',
+    body: 'El cliente sube el PDF firmado como <code>multipart/form-data</code>. No hay parámetros adicionales: toda la información necesaria para verificar (certificado, algoritmo, valor de firma) viaja dentro del propio PDF.',
+    tags: ['REST', 'multipart/form-data']
+  },
+  ctrl: {
+    title: 'DocumentController.verify()',
+    body: 'Extrae los bytes del <code>MultipartFile</code> con <code>file.getBytes()</code> y los pasa a <code>VerificationService.verificarDocumentoFirmado(bytes)</code>. El resultado <code>VerificationResultResponse</code> es un Java record que Spring serializa automáticamente a JSON.',
+    tags: ['@PostMapping("/verify")', 'Java Record']
+  },
+  byre: {
+    title: 'ByteRangeExtractor.extraer()',
+    body: 'Usa PDFBox para cargar el PDF y leer el diccionario de firma (<code>PDSignature</code>). Extrae el array <code>/ByteRange</code> con los 4 offsets. Con ellos: (1) ensambla los bytes que fueron firmados (tramo1 + tramo2, saltando /Contents), (2) extrae el DER de /Contents como bytes crudos. También valida que <code>offset1 == 0</code> y que <code>offset2 + longitud2 == tamaño total del PDF</code> para detectar ByteRanges incorrectos.',
+    tags: ['PDFBox', '/ByteRange', '/Contents', 'ResultadoExtraccion']
+  },
+  cms: {
+    title: 'CMSSignedData (BouncyCastle)',
+    body: 'Parsea el DER extraído de <code>/Contents</code> como un <code>ContentInfo</code> ASN.1, y lo convierte en un <code>CMSSignedData</code>. Este objeto contiene el conjunto de certificados X.509 y el conjunto de <code>SignerInfo</code> (uno por firmante). Si el DER está truncado o corrupto, falla aquí con un mensaje claro en el campo <code>razon</code>.',
+    tags: ['BouncyCastle', 'CMS/PKCS#7', 'ASN1InputStream', 'DER']
+  },
+  cert: {
+    title: 'Extracción del certificado X.509',
+    body: 'Llama a <code>cmsSignedData.getCertificates().getMatches(null)</code> para obtener todos los certificados embebidos. Convierte el primer <code>X509CertificateHolder</code> a <code>X509Certificate</code> con <code>JcaX509CertificateConverter</code>. Extrae el <code>subject</code>, <code>notBefore</code> y <code>notAfter</code>, y comprueba si <code>Instant.now()</code> cae dentro de la ventana de validez para calcular <code>certificadoVigente</code>.',
+    tags: ['X.509', 'JcaX509CertificateConverter', 'notBefore/notAfter']
+  },
+  sig: {
+    title: 'SignerInformation.verify() — la verificación criptográfica',
+    body: 'Busca el <code>SignerInfo</code> correspondiente al certificado usando <code>signer.getSID().match(certHolder)</code>. Llama a <code>signerInfo.verify(new JcaSimpleSignerInfoVerifierBuilder().setProvider("BC").build(certHolder))</code>: BouncyCastle recalcula el hash de los bytes firmados y compara contra el valor de firma almacenado en el CMS. Si coinciden → <code>firmaValida = true</code>. Cualquier bit modificado en el PDF producirá un hash diferente y <code>firmaValida = false</code>.',
+    tags: ['BouncyCastle', 'SignerInformation', 'Hash comparison']
+  },
+  resp: {
+    title: 'VerificationResultResponse',
+    body: 'Java record con 12 campos inmutables. Spring lo serializa a JSON automáticamente sin configuración adicional. El campo <code>valid</code> es el resultado final: <code>true</code> solo si <code>firmaValida && certificadoVigente</code>. El campo <code>razon</code> es <code>null</code> cuando todo fue bien, o una descripción del primer fallo encontrado.',
+    tags: ['Java Record', 'Spring JSON', 'VerificationResultResponse']
+  }
+};
+
+function flowDetail(flow, key) {
+  const prefix = flow === 'firma' ? 'fn-' : 'vn-';
+  const areaId = flow === 'firma' ? 'detail-firma' : 'detail-verify';
+  const details = flow === 'firma' ? firmaDetails : verifyDetails;
+
+  document.querySelectorAll('.flow-node').forEach(n => n.classList.remove('active'));
+  const node = document.getElementById(prefix + key);
+  if (node) node.classList.add('active');
+
+  const d = details[key];
+  if (!d) return;
+
+  document.getElementById(areaId).innerHTML = `
+    <div class="detail">
+      <div class="detail-header">
+        <h3>${d.title}</h3>
+      </div>
+      <div class="detail-body">
+        <p>${d.body}</p>
+        <div class="detail-tags">${d.tags.map(t => `<span class="dtag">${t}</span>`).join('')}</div>
+      </div>
+    </div>`;
+}
+
+// ── BYTERANGE VISUALIZER ──
+function updateBR() {
+  const size = parseInt(document.getElementById('br-size').value);
+  const pos  = parseInt(document.getElementById('br-pos').value);
+  const t1w  = pos;
+  const cw   = size;
+  const t2w  = 100 - pos - cw;
+
+  document.getElementById('br-t1').style.width = t1w + '%';
+  document.getElementById('br-c').style.left   = t1w + '%';
+  document.getElementById('br-c').style.width  = cw + '%';
+  document.getElementById('br-t2').style.width = t2w + '%';
+
+  document.getElementById('br-desc').textContent =
+    `ByteRange: [0, ${t1w}%, ${t1w+cw}%, ${t2w}%] — Bytes firmados: tramo1 (${t1w}%) + tramo2 (${t2w}%) = ${t1w+t2w}% del archivo. El bloque /Contents (${cw}%) está excluido.`;
+}
+updateBR();
+</script>
+
+<!-- Botón flotante de regreso al inicio -->
+<a href="index.html" style="
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #4f9cf9;
+  color: #fff;
+  font-family: 'Geist', sans-serif;
+  font-size: 0.875rem;
+  font-weight: 500;
+  padding: 0.6rem 1.1rem;
+  border-radius: 8px;
+  text-decoration: none;
+  box-shadow: 0 4px 16px rgba(79,156,249,0.35);
+  transition: background 0.18s, transform 0.15s;
+  z-index: 999;
+"
+onmouseover="this.style.background='#1d6fbf';this.style.transform='translateY(-2px)'"
+onmouseout="this.style.background='#4f9cf9';this.style.transform='translateY(0)'">
+  ← Volver a SecureSign
+</a>
+
+</body>
+</html>
