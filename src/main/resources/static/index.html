@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>SecureSign</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css"/>
+    <link rel="stylesheet" href="css/styles.css"/>
+</head>
+<body>
+
+<div class="app-shell">
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="sidebar-brand">
+            <i class="ti ti-shield-lock" aria-hidden="true"></i>
+            <span>SecureSign</span>
+        </div>
+        <nav class="sidebar-nav">
+            <button class="nav-item active" data-tab="generate">
+                <i class="ti ti-file-plus" aria-hidden="true"></i>
+                <span>Generar documento</span>
+            </button>
+            <button class="nav-item" data-tab="verify">
+                <i class="ti ti-shield-check" aria-hidden="true"></i>
+                <span>Verificar firma</span>
+            </button>
+        </nav>
+        <div class="sidebar-footer">
+            <span>PAdES · PKCS#12</span>
+        </div>
+    </aside>
+
+    <!-- Contenido principal -->
+    <main class="main-content">
+
+        <!-- Tab: Generar -->
+        <section id="tab-generate" class="tab-panel active">
+            <div class="panel-header">
+                <div class="panel-header-icon">
+                    <i class="ti ti-file-plus" aria-hidden="true"></i>
+                </div>
+                <div>
+                    <h1>Generar documento firmado</h1>
+                    <p class="panel-subtitle">Emite un PDF institucional con firma digital PAdES embebida</p>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-section-title">
+                    <i class="ti ti-user" aria-hidden="true"></i>
+                    Datos del titular
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="nombre">Nombre completo</label>
+                        <input type="text" id="nombre" placeholder="Ej. Juan Pérez García" autocomplete="off"/>
+                    </div>
+                    <div class="form-group">
+                        <label for="dni">DNI</label>
+                        <input type="text" id="dni" placeholder="Ej. 12345678" autocomplete="off"/>
+                    </div>
+                </div>
+
+                <div class="card-divider"></div>
+
+                <div class="card-section-title">
+                    <i class="ti ti-file-description" aria-hidden="true"></i>
+                    Datos del documento
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="tipo">Tipo de documento</label>
+                        <div class="select-wrapper">
+                            <select id="tipo">
+                                <option value="CONTRATO">Contrato</option>
+                                <option value="DECLARACION">Declaración</option>
+                                <option value="CERTIFICADO">Certificado</option>
+                            </select>
+                            <i class="ti ti-chevron-down select-arrow" aria-hidden="true"></i>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="fecha">Fecha de emisión</label>
+                        <input type="date" id="fecha"/>
+                    </div>
+                </div>
+
+                <div class="card-divider"></div>
+
+                <div class="card-section-title">
+                    <i class="ti ti-key" aria-hidden="true"></i>
+                    Configuración criptográfica
+                </div>
+                <div class="form-group">
+                    <label>Algoritmo de firma</label>
+                    <div class="algo-grid" id="algo-grid">
+                        <label class="algo-card">
+                            <input type="radio" name="algorithm" value="EC" checked/>
+                            <div class="algo-card-inner">
+                                <div class="algo-name">EC · secp256r1</div>
+                                <div class="algo-sig">SHA256withECDSA</div>
+                                <div class="algo-badge">Recomendado</div>
+                            </div>
+                        </label>
+                        <label class="algo-card">
+                            <input type="radio" name="algorithm" value="Ed25519"/>
+                            <div class="algo-card-inner">
+                                <div class="algo-name">Ed25519</div>
+                                <div class="algo-sig">EdDSA · Curva 25519</div>
+                                <div class="algo-badge algo-badge-alt">Alta seguridad</div>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button id="btn-generate" class="btn btn-primary">
+                        <i class="ti ti-download" aria-hidden="true"></i>
+                        Generar y descargar PDF
+                    </button>
+                    <div id="generate-status" class="status-msg hidden"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Tab: Verificar -->
+        <section id="tab-verify" class="tab-panel">
+            <div class="panel-header">
+                <div class="panel-header-icon panel-header-icon--verify">
+                    <i class="ti ti-shield-check" aria-hidden="true"></i>
+                </div>
+                <div>
+                    <h1>Verificar documento firmado</h1>
+                    <p class="panel-subtitle">Comprueba la autenticidad de un PDF con firma PAdES embebida</p>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="drop-zone" id="drop-zone">
+                    <input type="file" id="file-input" accept=".pdf"/>
+                    <i class="ti ti-cloud-upload drop-icon" aria-hidden="true"></i>
+                    <p class="drop-text">Arrastra aquí tu PDF firmado</p>
+                    <p class="drop-hint">o haz clic para seleccionar el archivo</p>
+                    <div id="file-selected" class="file-selected hidden">
+                        <i class="ti ti-file-type-pdf" aria-hidden="true"></i>
+                        <span id="file-name"></span>
+                        <button id="btn-clear-file" class="btn-icon" aria-label="Quitar archivo">
+                            <i class="ti ti-x" aria-hidden="true"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button id="btn-verify" class="btn btn-primary" disabled>
+                        <i class="ti ti-shield-search" aria-hidden="true"></i>
+                        Verificar firma
+                    </button>
+                </div>
+
+                <div id="verify-result" class="verify-result hidden"></div>
+            </div>
+        </section>
+
+    </main>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

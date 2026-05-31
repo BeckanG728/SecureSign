@@ -1,35 +1,59 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+             https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
+
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
         <version>4.0.6</version>
-        <relativePath/> <!-- lookup parent from repository -->
+        <relativePath/>
     </parent>
+
     <groupId>es.faustino</groupId>
     <artifactId>SecureSign</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <name>SecureSign</name>
-    <description>SecureSign</description>
-    <url/>
-    <licenses>
-        <license/>
-    </licenses>
-    <developers>
-        <developer/>
-    </developers>
-    <scm>
-        <connection/>
-        <developerConnection/>
-        <tag/>
-        <url/>
-    </scm>
+    <description>Firma PAdES robusta con DSS 6.4 + PDFBox 3.x</description>
+
     <properties>
         <java.version>17</java.version>
+        <!-- Versión DSS centralizada — cambiar aquí para actualizar todo -->
+        <dss.version>6.4</dss.version>
+        <!--
+            CRÍTICO: PDFBox 3.x es OBLIGATORIO para DSS 6.x.
+            PDFBox 2.x genera saveIncremental() con ByteRange incorrecto
+            porque calcula los offsets ANTES de serializar el objeto xref,
+            provocando desalineación de exactamente 1–4 bytes en el bloque /Contents.
+            Resultado: "ByteRange invalid" en Adobe Acrobat.
+        -->
+        <pdfbox.version>3.0.3</pdfbox.version>
     </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <!--
+                BOM de DSS — gestiona versiones de BouncyCastle, xmlsec, etc.
+                DEBE declararse ANTES que cualquier dependencia individual de BC
+                para evitar conflictos de versiones entre bcprov-jdk15on y bcprov-jdk18on.
+            -->
+            <dependency>
+                <groupId>eu.europa.ec.joinup.sd-dss</groupId>
+                <artifactId>dss-bom</artifactId>
+                <version>${dss.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
     <dependencies>
+
+        <!-- ═══════════════════════════════════════════════════════════════
+             SPRING BOOT
+        ════════════════════════════════════════════════════════════════ -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-webmvc</artifactId>
@@ -38,21 +62,100 @@
             <groupId>org.springframework.security</groupId>
             <artifactId>spring-security-crypto</artifactId>
         </dependency>
+
+        <!-- ═══════════════════════════════════════════════════════════════
+             DSS — Digital Signature Services (UE)
+             Responsabilidad: firma PAdES, CMS detached, ByteRange, incremental save
+        ════════════════════════════════════════════════════════════════ -->
+
+        <!-- Núcleo PAdES: parámetros, PAdESService, SignatureLevel -->
+        <dependency>
+            <groupId>eu.europa.ec.joinup.sd-dss</groupId>
+            <artifactId>dss-pades</artifactId>
+        </dependency>
+
+        <!--
+            Bridge DSS ↔ PDFBox 3.x.
+            EXCLUIMOS el pdfbox transitivo del bridge para forzar nuestra versión 3.0.3.
+            Sin esta exclusión Maven puede resolver 3.0.2 (la que empaqueta DSS)
+            y mezclarla con la nuestra, causando ClassCastException en
+            PDFBoxSignatureService al construir el ByteRange incremental.
+        -->
+        <dependency>
+            <groupId>eu.europa.ec.joinup.sd-dss</groupId>
+            <artifactId>dss-pades-pdfbox</artifactId>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.apache.pdfbox</groupId>
+                    <artifactId>pdfbox</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+        <!-- Token: KeyStoreSignatureTokenConnection (PKCS12 → DSS) -->
+        <dependency>
+            <groupId>eu.europa.ec.joinup.sd-dss</groupId>
+            <artifactId>dss-token</artifactId>
+        </dependency>
+
+        <!-- Utilidades: IOUtils, Base64, etc. — wrapper Apache Commons -->
+        <dependency>
+            <groupId>eu.europa.ec.joinup.sd-dss</groupId>
+            <artifactId>dss-utils-apache-commons</artifactId>
+        </dependency>
+
+        <!--
+            dss-cms-object: modelo de objetos CMS/PKCS#7.
+            Necesario para CMS detached en PAdES — contiene CMSSignedDocument
+            y la interfaz CMS que usan los parsers internos de DSS.
+        -->
+        <dependency>
+            <groupId>eu.europa.ec.joinup.sd-dss</groupId>
+            <artifactId>dss-cms-object</artifactId>
+        </dependency>
+
+        <!-- Validación offline de firmas PAdES con DSS -->
+        <dependency>
+            <groupId>eu.europa.ec.joinup.sd-dss</groupId>
+            <artifactId>dss-cades</artifactId>
+        </dependency>
+
+        <!-- ═══════════════════════════════════════════════════════════════
+             PDFBox 3.x — SOLO para generación de PDF antes del firmado.
+             NUNCA para modificar PDFs ya firmados.
+             La versión 3.x es compatible con DSS 6.x (usa la nueva API
+             de COSDocument sin deprecated COSStream.createTempBuffer).
+        ════════════════════════════════════════════════════════════════ -->
         <dependency>
             <groupId>org.apache.pdfbox</groupId>
             <artifactId>pdfbox</artifactId>
-            <version>3.0.1</version>
+            <version>${pdfbox.version}</version>
         </dependency>
+
+        <!-- ═══════════════════════════════════════════════════════════════
+             BouncyCastle — gestionado por el BOM de DSS.
+             NO declarar versión explícita aquí: el BOM elige bcprov-jdk18on
+             que es compatible con Java 17+ y con los CMS que genera DSS.
+             Mezclar jdk15on + jdk18on → ClassNotFoundException en runtime.
+        ════════════════════════════════════════════════════════════════ -->
         <dependency>
             <groupId>org.bouncycastle</groupId>
             <artifactId>bcpkix-jdk18on</artifactId>
-            <version>1.84</version>
         </dependency>
+        <dependency>
+            <groupId>org.bouncycastle</groupId>
+            <artifactId>bcprov-jdk18on</artifactId>
+        </dependency>
+
+        <!-- ═══════════════════════════════════════════════════════════════
+             TEST
+        ════════════════════════════════════════════════════════════════ -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-webmvc-test</artifactId>
             <scope>test</scope>
         </dependency>
+
     </dependencies>
 
     <build>
