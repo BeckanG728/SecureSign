@@ -1,7 +1,6 @@
 # SecureSign
 
-API REST para la emisión y verificación de documentos PDF con firma digital embebida siguiendo el estándar **PAdES** (
-PDF Advanced Electronic Signatures), implementado con Bouncy Castle sobre Spring Boot.
+API REST para la emisión y verificación de documentos PDF con firma digital embebida siguiendo el estándar **PAdES-Baseline-B** (PDF Advanced Electronic Signatures), implementado con **DSS 6.4** (Digital Signature Services de la UE) + **PDFBox 3.x** + **Bouncy Castle** sobre Spring Boot 4.x.
 
 ---
 
@@ -81,22 +80,30 @@ Body JSON:
 }
 ```
 
-El campo `algorithm` acepta `EC` o `Ed25519`. Devuelve el PDF firmado como `application/pdf`.
+El campo `algorithm` acepta `EC` (ECDSA sobre secp256r1 con SHA-256) o `Ed25519` (EdDSA con SHA-512). Devuelve el PDF firmado como `application/pdf` con cabecera `Content-Disposition: attachment; filename="documento_<dni>.pdf"`.
 
 ### POST `/api/documents/verify`
 
-Body `multipart/form-data` con el campo `file` conteniendo el PDF firmado. Devuelve JSON:
+Body `multipart/form-data` con el campo `file` conteniendo el PDF firmado. Devuelve JSON con diagnóstico granular:
 
 ```json
 {
   "valid": true,
+  "firmaExtraible": true,
+  "byteRangeValido": true,
+  "cmsParseable": true,
+  "certificadoExtraible": true,
   "firmaValida": true,
   "certificadoVigente": true,
   "subject": "CN=SecureSign Institucional, O=Universidad, C=PE",
-  "validoDesde": "Fri May 30 ...",
-  "validoHasta": "Sat May 30 ..."
+  "validoDesde": "2026-05-30T00:00:00Z",
+  "validoHasta": "2027-05-30T00:00:00Z",
+  "algoritmoFirma": "SHA256withECDSA",
+  "razon": null
 }
 ```
+
+El campo `valid` es `true` únicamente si **tanto** `firmaValida` como `certificadoVigente` son verdaderos. Ante cualquier error, `razon` describe el punto de fallo exacto.
 
 ---
 
@@ -104,101 +111,57 @@ Body `multipart/form-data` con el campo `file` conteniendo el PDF firmado. Devue
 
 ### Generación de claves — ECDSA y Ed25519
 
-Cada documento se firma con un par de claves efímero generado en tiempo de ejecución. El proyecto soporta dos familias
-de algoritmos de curva elíptica:
+Cada documento se firma con un par de claves efímero generado en tiempo de ejecución mediante `KeyManagementService`. El proyecto soporta dos familias de algoritmos de curva elíptica:
 
 **EC (ECDSA sobre secp256r1)**
 
-```java
-KeyPairGenerator kpg = KeyPairGenerator.getInstance("EC");
-kpg.initialize(new ECGenParameterSpec("secp256r1"));
-KeyPair keyPair = kpg.generateKeyPair();
-```
-
-`secp256r1` (también llamada `P-256`) es la curva recomendada por NIST SP 800-186 y es ampliamente utilizada en TLS 1.3,
-JWT (ES256) y documentos eIDAS. Produce claves de 256 bits con seguridad equivalente a RSA-3072.
+`secp256r1` (también llamada `P-256`) es la curva recomendada por NIST SP 800-186 y es ampliamente utilizada en TLS 1.3, JWT (ES256) y documentos eIDAS. Produce claves de 256 bits con seguridad equivalente a RSA-3072. La firma usa el algoritmo de digest **SHA-256**.
 
 **Ed25519 (EdDSA)**
 
-```java
-KeyPairGenerator kpg = KeyPairGenerator.getInstance("Ed25519");
-KeyPair keyPair = kpg.generateKeyPair();
-```
-
-Ed25519 está definido en RFC 8032 y es parte del estándar FIPS 186-5. Su diseño evita por construcción ataques de canal
-lateral relacionados con la aleatoriedad del nonce (un punto débil histórico de ECDSA). Es el algoritmo preferido en
-sistemas modernos como SSH, Signal y WireGuard.
+Ed25519 está definido en RFC 8032 y es parte del estándar FIPS 186-5. Su diseño evita por construcción ataques de canal lateral relacionados con la aleatoriedad del nonce (un punto débil histórico de ECDSA). Es el algoritmo preferido en sistemas modernos como SSH, Signal y WireGuard. La firma usa el algoritmo de digest **SHA-512**.
 
 ### Certificados X.509 autofirmados
 
-Para cada firma se genera un certificado X.509 v3 que vincula la clave pública con la identidad institucional:
+Para cada firma se genera un certificado X.509 v3 autofirmado (issuer == subject) a través de `CertificateX509Service`, vinculando la clave pública con la identidad institucional:
 
-```java
-X500Name subject = new X500Name("CN=SecureSign Institucional, O=Universidad, C=PE");
-JcaX509v3CertificateBuilder builder = new JcaX509v3CertificateBuilder(
-    subject, serial, notBefore, notAfter, subject, keyPair.getPublic()
-);
+```
+CN=SecureSign Institucional, O=Universidad, C=PE
 ```
 
-El certificado tiene un período de validez de 365 días y es autofirmado (issuer == subject). Aunque en producción estos
-certificados deberían estar firmados por una CA de confianza (jerarquía PKI), el modelo autofirmado es suficiente para
-demostrar la estructura PAdES porque el certificado viaja embebido en el propio PDF y la verificación no depende de una
-cadena de confianza externa.
+El certificado tiene un período de validez de 365 días. Aunque en producción estos certificados deberían estar firmados por una CA de confianza (jerarquía PKI), el modelo autofirmado es suficiente para demostrar la estructura PAdES: el certificado viaja embebido en el propio PDF y la verificación no depende de una cadena de confianza externa.
 
-### Almacenamiento de claves — PKCS#12
+### Almacenamiento de claves — PKCS#12 + DSS Token
 
-Las claves privadas y los certificados se persisten en un KeyStore de tipo PKCS#12 (`.p12`), el formato interoperable
-definido en RFC 7292:
+Las claves privadas y los certificados se persisten en un KeyStore de tipo PKCS#12 (`securesign.p12`) gestionado por `KeyStoreService`. El acceso al KeyStore desde DSS se realiza mediante `KeyStoreSignatureTokenConnection`, que expone la clave privada como `KSPrivateKeyEntry` para la firma delegada a `PAdESService`.
 
-```java
-KeyStore ks = KeyStore.getInstance("PKCS12");
-ks.setKeyEntry(keyId, privateKey, password, new Certificate[]{ cert });
-```
+El archivo se cifra simétricamente con la contraseña inyectada via variable de entorno. Cada par de claves recibe un UUID como alias, lo que permite gestionar múltiples identidades en el mismo almacén sin colisiones.
 
-El archivo se cifra simétricamente con la contraseña inyectada via variable de entorno. Cada par de claves recibe un
-UUID como alias (`keyId`), lo que permite gestionar múltiples identidades en el mismo almacén sin colisiones.
+### Firma PAdES con DSS — PAdES-Baseline-B
 
-### Firma PAdES — estructura CMS/PKCS#7
-
-La firma sobre el PDF sigue el perfil **PAdES-BES** (ETSI EN 319 132), que embebe una estructura CMS SignedData
-directamente en el stream del documento PDF:
+La firma sigue el perfil **PAdES-Baseline-B** (ETSI EN 319 132), delegando todo el proceso de firma incremental, gestión del `ByteRange` y serialización CMS a la librería DSS de la Comisión Europea:
 
 ```java
-ContentSigner signer = new JcaContentSignerBuilder(sigAlg).build(privateKey);
-CMSSignedDataGenerator gen = new CMSSignedDataGenerator();
-gen.addSignerInfoGenerator(
-    new JcaSignerInfoGeneratorBuilder(digestProvider).build(signer, cert)
-);
-gen.addCertificates(new JcaCertStore(List.of(cert)));
-CMSSignedData signedData = gen.generate(new CMSProcessableByteArray(content), false);
+PAdESSignatureParameters parametros = new PAdESSignatureParameters();
+parametros.setSignatureLevel(SignatureLevel.PAdES_BASELINE_B);
+parametros.setSignaturePackaging(SignaturePackaging.ENVELOPED);
+
+ToBeSigned datosAFirmar = servicioPades.getDataToSign(documentoPdf, parametros);
+SignatureValue valorFirma = conexionToken.sign(datosAFirmar, DigestAlgorithm.SHA256, entradaClave);
+DSSDocument documentoFirmado = servicioPades.signDocument(documentoPdf, parametros, valorFirma);
 ```
 
-El último argumento `false` en `gen.generate()` indica firma *detached*: los bytes firmados no se duplican dentro del
-CMS, sino que la firma referencia el contenido original del PDF. PDFBox embebe esta firma en un rango de bytes
-reservado (`/ByteRange`) del documento, produciendo un PDF autocontenible verificable independientemente.
+El uso de PDFBox 3.x es **obligatorio** con DSS 6.x: PDFBox 2.x calculaba los offsets del `ByteRange` antes de serializar el objeto xref, produciendo una desalineación de 1-4 bytes en `/Contents` que Adobe Acrobat rechaza con "ByteRange invalid".
 
-### Verificación independiente del servidor
+### Verificación independiente — ByteRange + CMS directo
 
-La verificación no requiere ningún estado del servidor ni el `keyId` original. El PDF contiene todo lo necesario:
+La verificación en `VerificationService` opera directamente sobre la estructura binaria del PDF sin depender del estado del servidor, en dos fases:
 
-```java
-// Extraer firma embebida
-byte[] signatureBytes = signature.getContents(pdfBytes);   // estructura CMS
-byte[] signedContent  = signature.getSignedContent(pdfBytes); // bytes cubiertos por la firma
+1. **`ByteRangeExtractor`** parsea el PDF, extrae el rango `/ByteRange`, los bytes firmados y el bloque CMS DER de `/Contents`, y valida que el ByteRange sea coherente con el tamaño real del fichero.
 
-// Reconstruir y verificar
-CMSSignedData cmsSignedData = new CMSSignedData(
-    new CMSProcessableByteArray(signedContent), signatureBytes
-);
-X509Certificate cert = extraerCertificadoDelCMS(cmsSignedData);
-boolean firmaValida = signerInfo.verify(
-    new JcaSimpleSignerInfoVerifierBuilder().build(cert)
-);
-```
+2. **Verificación CMS con Bouncy Castle**: reconstruye el `CMSSignedData` con los bytes firmados y verifica la firma mediante `JcaSimpleSignerInfoVerifierBuilder`. El certificado X.509 se extrae del propio CMS embebido.
 
-Este es el principio central de PAdES: el documento es autocontenible. La firma cubre el contenido del PDF (no su hash
-en una base de datos externa), y el certificado X.509 del firmante viaja embebido en el mismo CMS. Cualquier
-modificación posterior al PDF invalida la firma criptográficamente.
+La respuesta incluye diagnóstico granular (`firmaExtraible`, `byteRangeValido`, `cmsParseable`, `certificadoExtraible`, `firmaValida`, `certificadoVigente`) para identificar exactamente en qué paso falla la verificación. El algoritmo de firma se resuelve desde los OIDs del `SignerInfo` con soporte para ECDSA, Ed25519 y RSA.
 
 ---
 
@@ -207,42 +170,60 @@ modificación posterior al PDF invalida la firma criptográficamente.
 ```
 src/main/
 ├── java/es/faustino/securesign/
-│   ├── certificate/
-│   │   └── CertificateX509Service.java   # Generación de certificados X.509
-│   ├── config/
-│   │   └── WebConfig.java                # CORS
 │   ├── controller/
-│   │   └── DocumentController.java       # Endpoints REST
-│   ├── document/
-│   │   └── DocumentService.java          # Orquestación del flujo completo
-│   ├── exception/
-│   │   ├── GlobalExceptionHandler.java
-│   │   └── KeyNotFoundException.java
-│   ├── model/
-│   │   ├── DocumentRequest.java          # DTO de entrada
-│   │   └── VerifyRequest.java
-│   ├── signature/
-│   │   └── SignatureService.java         # KeyStore PKCS#12 + firma PAdES
-│   └── verification/
-│       └── VerificationService.java      # Verificación CMS independiente
+│   │   └── DocumentController.java        # Endpoints REST: /generate y /verify
+│   ├── dto/
+│   │   ├── internal/
+│   │   │   └── ResultadoExtraccion.java   # DTO interno: ByteRange + bytes CMS
+│   │   ├── request/
+│   │   │   └── DocumentRequest.java       # DTO de entrada (record)
+│   │   └── response/
+│   │       └── VerificationResultResponse.java  # DTO de respuesta con diagnóstico granular
+│   ├── keys/
+│   │   ├── KeyManagementService.java      # Generación de pares de claves (EC / Ed25519)
+│   │   └── KeyStoreService.java           # Carga y persistencia del KeyStore PKCS#12
+│   ├── services/
+│   │   ├── certificate/
+│   │   │   └── CertificateX509Service.java  # Generación de certificados X.509 autofirmados
+│   │   ├── document/
+│   │   │   └── DocumentService.java         # Orquestación: generación PDF + firma
+│   │   ├── signature/
+│   │   │   └── SignatureService.java         # Firma PAdES-B via DSS + KeyStoreSignatureTokenConnection
+│   │   └── verification/
+│   │       └── VerificationService.java      # Verificación CMS con Bouncy Castle
+│   ├── shared/
+│   │   ├── config/
+│   │   │   ├── BouncyCastleConfig.java    # Registro del provider BC
+│   │   │   └── WebConfig.java            # Configuración CORS
+│   │   ├── exception/
+│   │   │   ├── GlobalExceptionHandler.java
+│   │   │   └── KeyNotFoundException.java
+│   │   └── util/
+│   │       └── ByteRangeExtractor.java   # Parser binario del ByteRange PDF
+│   └── SecureSignApplication.java
 └── resources/
     ├── application.yaml
-    └── static/                           # Interfaz web
+    └── static/                            # Interfaz web
         ├── index.html
         ├── css/styles.css
         └── js/
-            ├── api.js                    # Llamadas fetch a los endpoints
-            ├── ui.js                     # Manipulación del DOM
-            └── app.js                    # Lógica y eventos
+            ├── api.js                     # Llamadas fetch a los endpoints
+            ├── ui.js                      # Manipulación del DOM
+            └── app.js                     # Lógica y eventos
 ```
 
 ---
 
 ## Dependencias principales
 
-| Librería                         | Versión | Rol                                      |
-|----------------------------------|---------|------------------------------------------|
-| Spring Boot Web MVC              | 4.0.6   | Framework HTTP y servidor embebido       |
-| Apache PDFBox                    | 3.0.1   | Generación y firma de documentos PDF     |
-| Bouncy Castle (`bcpkix-jdk18on`) | 1.84    | Criptografía: ECDSA, Ed25519, CMS, X.509 |
-| Spring Security Crypto           | (BOM)   | Utilidades de cifrado para el KeyStore   |
+| Librería                              | Versión | Rol                                                   |
+|---------------------------------------|---------|-------------------------------------------------------|
+| Spring Boot Web MVC                   | 4.0.6   | Framework HTTP y servidor embebido                    |
+| DSS `dss-pades`                       | 6.4     | Parámetros y servicio PAdES-Baseline-B                |
+| DSS `dss-pades-pdfbox`                | 6.4     | Bridge DSS ↔ PDFBox 3.x para firma incremental        |
+| DSS `dss-token`                       | 6.4     | `KeyStoreSignatureTokenConnection` (PKCS#12 → DSS)    |
+| DSS `dss-cades`                       | 6.4     | Validación offline de firmas CMS                      |
+| DSS `dss-cms-object`                  | 6.4     | Modelo de objetos CMS/PKCS#7                          |
+| Apache PDFBox                         | 3.0.3   | Generación de PDF antes del firmado                   |
+| Bouncy Castle (`bcpkix-jdk18on`)      | (BOM)   | ECDSA, Ed25519, CMS, X.509 — versión gestionada por DSS BOM |
+| Spring Security Crypto                | (BOM)   | Utilidades de cifrado para el KeyStore                |

@@ -19,8 +19,8 @@
         </div>
         <nav class="sidebar-nav">
             <button class="nav-item active" data-tab="generate">
-                <i class="ti ti-file-plus" aria-hidden="true"></i>
-                <span>Generar documento</span>
+                <i class="ti ti-file-certificate" aria-hidden="true"></i>
+                <span>Firmar documento</span>
             </button>
             <button class="nav-item" data-tab="verify">
                 <i class="ti ti-shield-check" aria-hidden="true"></i>
@@ -35,55 +35,30 @@
     <!-- Contenido principal -->
     <main class="main-content">
 
-        <!-- Tab: Generar -->
+        <!-- Tab: Firmar -->
         <section id="tab-generate" class="tab-panel active">
             <div class="panel-header">
                 <div class="panel-header-icon">
-                    <i class="ti ti-file-plus" aria-hidden="true"></i>
+                    <i class="ti ti-file-certificate" aria-hidden="true"></i>
                 </div>
                 <div>
-                    <h1>Generar documento firmado</h1>
-                    <p class="panel-subtitle">Emite un PDF institucional con firma digital PAdES embebida</p>
+                    <h1>Firmar documento PDF</h1>
+                    <p class="panel-subtitle">Sube un PDF existente y obtén la versión con firma PAdES embebida</p>
                 </div>
             </div>
 
             <div class="card">
-                <div class="card-section-title">
-                    <i class="ti ti-user" aria-hidden="true"></i>
-                    Datos del titular
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="nombre">Nombre completo</label>
-                        <input type="text" id="nombre" placeholder="Ej. Juan Pérez García" autocomplete="off"/>
-                    </div>
-                    <div class="form-group">
-                        <label for="dni">DNI</label>
-                        <input type="text" id="dni" placeholder="Ej. 12345678" autocomplete="off"/>
-                    </div>
-                </div>
-
-                <div class="card-divider"></div>
-
-                <div class="card-section-title">
-                    <i class="ti ti-file-description" aria-hidden="true"></i>
-                    Datos del documento
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="tipo">Tipo de documento</label>
-                        <div class="select-wrapper">
-                            <select id="tipo">
-                                <option value="CONTRATO">Contrato</option>
-                                <option value="DECLARACION">Declaración</option>
-                                <option value="CERTIFICADO">Certificado</option>
-                            </select>
-                            <i class="ti ti-chevron-down select-arrow" aria-hidden="true"></i>
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label for="fecha">Fecha de emisión</label>
-                        <input type="date" id="fecha"/>
+                <div class="drop-zone" id="drop-zone-sign">
+                    <input type="file" id="file-input-sign" accept=".pdf"/>
+                    <i class="ti ti-cloud-upload drop-icon" aria-hidden="true"></i>
+                    <p class="drop-text">Arrastra aquí tu PDF sin firmar</p>
+                    <p class="drop-hint">o haz clic para seleccionar el archivo</p>
+                    <div id="file-selected-sign" class="file-selected hidden">
+                        <i class="ti ti-file-type-pdf" aria-hidden="true"></i>
+                        <span id="file-name-sign"></span>
+                        <button id="btn-clear-sign" class="btn-icon" aria-label="Quitar archivo">
+                            <i class="ti ti-x" aria-hidden="true"></i>
+                        </button>
                     </div>
                 </div>
 
@@ -91,10 +66,9 @@
 
                 <div class="card-section-title">
                     <i class="ti ti-key" aria-hidden="true"></i>
-                    Configuración criptográfica
+                    Algoritmo de firma
                 </div>
                 <div class="form-group">
-                    <label>Algoritmo de firma</label>
                     <div class="algo-grid" id="algo-grid">
                         <label class="algo-card">
                             <input type="radio" name="algorithm" value="EC" checked/>
@@ -116,9 +90,9 @@
                 </div>
 
                 <div class="form-actions">
-                    <button id="btn-generate" class="btn btn-primary">
-                        <i class="ti ti-download" aria-hidden="true"></i>
-                        Generar y descargar PDF
+                    <button id="btn-generate" class="btn btn-primary" disabled>
+                        <i class="ti ti-pen" aria-hidden="true"></i>
+                        Firmar y descargar PDF
                     </button>
                     <div id="generate-status" class="status-msg hidden"></div>
                 </div>

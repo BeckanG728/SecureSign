@@ -1,6 +1,5 @@
 package es.faustino.securesign.controller;
 
-import es.faustino.securesign.dto.request.DocumentRequest;
 import es.faustino.securesign.dto.response.VerificationResultResponse;
 import es.faustino.securesign.services.document.DocumentService;
 import es.faustino.securesign.services.verification.VerificationService;
@@ -24,18 +23,21 @@ public class DocumentController {
     }
 
     @PostMapping("/generate")
-    public ResponseEntity<byte[]> generate(@RequestBody DocumentRequest request) throws Exception {
-        byte[] pdfFirmado = documentService.emitirDocumentoFirmado(
-                request.nombre(), request.dni(),
-                request.tipo(), request.fecha(),
-                request.algorithm()
-        );
+    public ResponseEntity<byte[]> generate(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "algorithm", defaultValue = "EC") String algorithm) throws Exception {
 
-        String nombreArchivo = "documento_" + request.dni();
+        byte[] pdfFirmado = documentService.firmarDocumento(file.getBytes(), algorithm);
+
+        String nombreOriginal = file.getOriginalFilename();
+        String nombreBase = (nombreOriginal != null && nombreOriginal.endsWith(".pdf"))
+                ? nombreOriginal.replace(".pdf", "")
+                : "documento";
+        String nombreArchivo = nombreBase + "_firmado.pdf";
 
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_PDF_VALUE)
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + nombreArchivo + ".pdf\"")
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + nombreArchivo + "\"")
                 .header(HttpHeaders.CONTENT_LENGTH, String.valueOf(pdfFirmado.length))
                 .body(pdfFirmado);
     }

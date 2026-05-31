@@ -20,10 +20,16 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // ── Elementos ─────────────────────────────────────────────────────────────
-    const btnGenerate    = document.getElementById('btn-generate');
-    const generateStatus = document.getElementById('generate-status');
+    // ── Elementos: Firmar ─────────────────────────────────────────────────────
+    const btnGenerate      = document.getElementById('btn-generate');
+    const generateStatus   = document.getElementById('generate-status');
+    const fileInputSign    = document.getElementById('file-input-sign');
+    const fileSelectedSign = document.getElementById('file-selected-sign');
+    const fileNameSign     = document.getElementById('file-name-sign');
+    const btnClearSign     = document.getElementById('btn-clear-sign');
+    const dropZoneSign     = document.getElementById('drop-zone-sign');
 
+    // ── Elementos: Verificar ──────────────────────────────────────────────────
     const btnVerify      = document.getElementById('btn-verify');
     const verifyResult   = document.getElementById('verify-result');
     const fileInput      = document.getElementById('file-input');
@@ -32,10 +38,47 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnClearFile   = document.getElementById('btn-clear-file');
     const dropZone       = document.getElementById('drop-zone');
 
-    // Fecha actual por defecto
-    document.getElementById('fecha').value = new Date().toISOString().split('T')[0];
+    // ── Drop-zone: Firmar ─────────────────────────────────────────────────────
+    let selectedFileSign = null;
 
-    // ── Drop-zone ─────────────────────────────────────────────────────────────
+    dropZoneSign.addEventListener('dragover', e => {
+        e.preventDefault();
+        dropZoneSign.classList.add('drag-over');
+    });
+    dropZoneSign.addEventListener('dragleave', () => dropZoneSign.classList.remove('drag-over'));
+    dropZoneSign.addEventListener('drop', e => {
+        e.preventDefault();
+        dropZoneSign.classList.remove('drag-over');
+        const file = e.dataTransfer.files[0];
+        if (file && file.type === 'application/pdf') handleFileSignSelected(file);
+    });
+    fileInputSign.addEventListener('change', () => {
+        if (fileInputSign.files[0]) handleFileSignSelected(fileInputSign.files[0]);
+    });
+    btnClearSign.addEventListener('click', e => {
+        e.stopPropagation();
+        clearFileSign();
+    });
+
+    function handleFileSignSelected(file) {
+        selectedFileSign = file;
+        fileNameSign.textContent = file.name;
+        fileSelectedSign.classList.remove('hidden');
+        btnGenerate.disabled = false;
+        hideElement(generateStatus);
+        generateStatus.className = 'status-msg hidden';
+    }
+
+    function clearFileSign() {
+        selectedFileSign = null;
+        fileInputSign.value = '';
+        fileSelectedSign.classList.add('hidden');
+        btnGenerate.disabled = true;
+        hideElement(generateStatus);
+        generateStatus.className = 'status-msg hidden';
+    }
+
+    // ── Drop-zone: Verificar ──────────────────────────────────────────────────
     let selectedFile = null;
 
     dropZone.addEventListener('dragover', e => {
@@ -75,30 +118,24 @@ document.addEventListener('DOMContentLoaded', () => {
         verifyResult.className = 'verify-result hidden';
     }
 
-    // ── Generar documento ─────────────────────────────────────────────────────
+    // ── Firmar documento ──────────────────────────────────────────────────────
     btnGenerate.addEventListener('click', async () => {
-        const nombre    = document.getElementById('nombre').value.trim();
-        const dni       = document.getElementById('dni').value.trim();
-        const tipo      = document.getElementById('tipo').value;
-        const fecha     = document.getElementById('fecha').value;
+        if (!selectedFileSign) return;
+
         const algorithm = document.querySelector('input[name="algorithm"]:checked').value;
 
-        if (!nombre || !dni || !fecha) {
-            showStatus(generateStatus, 'error', 'Completa todos los campos antes de continuar.');
-            return;
-        }
-
-        setButtonLoading(btnGenerate, true, 'Generando...', 'Generar y descargar PDF', 'ti-download');
-        showStatus(generateStatus, 'loading', 'Generando documento firmado, por favor espera…');
+        setButtonLoading(btnGenerate, true, 'Firmando...', 'Firmar y descargar PDF', 'ti-pen');
+        showStatus(generateStatus, 'loading', 'Firmando documento, por favor espera…');
 
         try {
-            const blob = await apiGenerateDocument({ nombre, dni, tipo, fecha, algorithm });
-            downloadBlob(blob, 'documento_firmado.pdf');
-            showStatus(generateStatus, 'success', 'Documento generado y descargado correctamente.');
+            const blob = await apiGenerateDocument(selectedFileSign, algorithm);
+            const nombreFirmado = selectedFileSign.name.replace(/\.pdf$/i, '_firmado.pdf');
+            downloadBlob(blob, nombreFirmado);
+            showStatus(generateStatus, 'success', 'Documento firmado y descargado correctamente.');
         } catch (error) {
             showStatus(generateStatus, 'error', 'Error: ' + error.message);
         } finally {
-            setButtonLoading(btnGenerate, false, '', 'Generar y descargar PDF', 'ti-download');
+            setButtonLoading(btnGenerate, false, '', 'Firmar y descargar PDF', 'ti-pen');
         }
     });
 

@@ -7,20 +7,24 @@
 const API_BASE = '/api/documents';
 
 /**
- * Genera un documento PDF firmado (PAdES).
- * @param {Object} payload - { nombre, dni, tipo, fecha, algorithm }
+ * Firma un PDF existente (PAdES).
+ * @param {File} file - Archivo PDF sin firmar
+ * @param {string} algorithm - 'EC' o 'Ed25519'
  * @returns {Promise<Blob>} - Blob del PDF firmado
  */
-async function apiGenerateDocument(payload) {
+async function apiGenerateDocument(file, algorithm) {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('algorithm', algorithm);
+
     const response = await fetch(`${API_BASE}/generate`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: formData,
     });
 
     if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(errorText || `Error ${response.status} al generar el documento`);
+        throw new Error(errorText || `Error ${response.status} al firmar el documento`);
     }
 
     return response.blob();
