@@ -1,7 +1,7 @@
 # SecureSign
 
-Backend REST para la generación y verificación de firmas digitales y certificados institucionales en PDF. Desarrollado
-con Spring Boot 4 y Java 17, orientado a un curso universitario de criptografía.
+API REST para firma digital y verificación de documentos PDF con **firma PAdES embebida**. Desarrollado con Spring Boot
+4 y Java 17, usando DSS (Digital Signature Services) de la UE y BouncyCastle.
 
 ---
 
@@ -11,7 +11,9 @@ con Spring Boot 4 y Java 17, orientado a un curso universitario de criptografía
 |------------------------|-------------------|
 | Java                   | 17                |
 | Spring Boot            | 4.0.6             |
-| Apache PDFBox          | 3.0.1             |
+| EU DSS (PAdES)         | 6.4               |
+| Apache PDFBox          | 3.0.3             |
+| BouncyCastle           | (BOM DSS 6.4)     |
 | Spring Security Crypto | (BOM Spring Boot) |
 | Maven                  | Wrapper incluido  |
 
@@ -22,23 +24,34 @@ con Spring Boot 4 y Java 17, orientado a un curso universitario de criptografía
 ```
 src/main/java/es/faustino/securesign/
 ├── SecureSignApplication.java
-├── config/
-│   └── WebConfig.java
 ├── controller/
-│   ├── SignatureController.java
-│   └── CertificateController.java
-├── service/
-│   ├── SignatureService.java
-│   └── CertificateService.java
-├── model/
-│   ├── SignRequest.java
-│   ├── SignResponse.java
-│   ├── VerifyRequest.java
-│   ├── KeyInfoResponse.java
-│   └── CertificateRequest.java
-└── exception/
-    ├── GlobalExceptionHandler.java
-    └── KeyNotFoundException.java
+│   └── DocumentController.java           # POST /api/documents/generate y /verify
+├── dto/
+│   ├── internal/
+│   │   └── ResultadoExtraccion.java
+│   └── response/
+│       └── VerificationResultResponse.java
+├── keys/
+│   ├── KeyManagementService.java         # Generación y búsqueda de pares de claves
+│   └── KeyStoreService.java              # Persistencia PKCS#12 en disco
+├── services/
+│   ├── certificate/
+│   │   └── CertificateX509Service.java   # Emisión de certificados X.509 autofirmados
+│   ├── document/
+│   │   └── DocumentService.java          # Orquestación: generar clave → firmar
+│   ├── signature/
+│   │   └── SignatureService.java         # Firma PAdES con DSS
+│   └── verification/
+│       └── VerificationService.java      # Verificación CMS/PAdES con BouncyCastle
+└── shared/
+    ├── config/
+    │   ├── BouncyCastleConfig.java
+    │   └── WebConfig.java
+    ├── exception/
+    │   ├── GlobalExceptionHandler.java
+    │   └── KeyNotFoundException.java
+    └── util/
+        └── ByteRangeExtractor.java       # Extracción del bloque /Contents y ByteRange
 ```
 
 ---
@@ -52,298 +65,154 @@ mvnw.cmd spring-boot:run     # Windows
 
 El servidor escucha en `http://localhost:8080`.
 
+La interfaz web está disponible en `http://localhost:8080/index.html`.
+
+### Variables de entorno
+
+| Variable                       | Valor por defecto         | Descripción                     |
+|--------------------------------|---------------------------|---------------------------------|
+| `SECURESIGN_KEYSTORE_PASSWORD` | `securesign-dev-password` | Contraseña del KeyStore PKCS#12 |
+
+El archivo del KeyStore se guarda como `securesign.p12` en el directorio de trabajo (configurable con
+`securesign.keystore-path`).
+
 ---
 
 ## API Reference
 
-### Claves y firma (`/api`)
+### `POST /api/documents/sign`
 
-#### Generar par de claves
+Firma un PDF con PAdES Baseline-B y devuelve el PDF firmado como descarga.
 
-```
-POST /api/keys/generate?algorithm={algorithm}
-```
+**Parámetros (multipart/form-data):**
 
-`algorithm`: `Ed25519` o `ECDSA`.
+| Campo       | Tipo    | Requerido | Descripción                    |
+|-------------|---------|-----------|--------------------------------|
+| `file`      | Archivo | Sí        | PDF a firmar                   |
+| `algorithm` | String  | No        | `EC` (por defecto) o `Ed25519` |
 
-```json
-{ "keyId": "uuid-generado", "algorithm": "Ed25519" }
-```
+**Respuesta:** `application/pdf` — el PDF original con la firma PAdES embebida.
 
-#### Obtener clave pública
-
-```
-GET /api/keys/{keyId}
-```
-
-```json
-{ "keyId": "...", "algorithm": "Ed25519", "publicKey": "<base64>" }
-```
-
-#### Firmar datos
-
-```
-POST /api/sign
-{ "keyId": "...", "algorithm": "Ed25519", "data": "<base64>" }
-```
-
-```json
-{ "keyId": "...", "algorithm": "Ed25519", "signature": "<base64>" }
-```
-
-#### Verificar firma
-
-```
-POST /api/verify
-{ "keyId": "...", "algorithm": "Ed25519", "data": "<base64>", "signature": "<base64>" }
-```
-
-```json
-{ "valid": true }
-```
-
-### Certificados PDF (`/api/certificates`)
-
-#### Generar certificado firmado
-
-```
-POST /api/certificates/generate
-{ "nombre": "Juan Pérez", "dni": "12345678A", "tipo": "Asistencia", "fecha": "2026-05-30", "algorithm": "Ed25519" }
-```
-
-Respuesta: binario PDF (`application/pdf`). Headers: `X-Key-Id`, `X-Algorithm`.
-
-#### Verificar certificado PDF
-
-```
-POST /api/certificates/verify?keyId={keyId}&algorithm={algorithm}
-Content-Type: multipart/form-data   →   file: <PDF>
-```
-
-```json
-{ "valid": true, "keyId": "...", "algorithm": "..." }
-```
+El nombre del archivo descargado será `<nombre-original>_firmado.pdf`.
 
 ---
 
-## Explicación del código
+### `POST /api/documents/verify`
 
-### Flujo general
+Verifica la firma PAdES de un PDF firmado.
 
-El proyecto sigue una arquitectura en capas estándar de Spring Boot:
+**Parámetros (multipart/form-data):**
 
-```
-HTTP Request → Controller → Service → (JCA / PDFBox) → Response
-```
+| Campo  | Tipo    | Requerido | Descripción             |
+|--------|---------|-----------|-------------------------|
+| `file` | Archivo | Sí        | PDF firmado a verificar |
 
-Los controladores solo traducen HTTP a llamadas de servicio. Toda la lógica criptográfica vive en los servicios.
+**Respuesta:** `application/json`
 
----
-
-### `SignatureService` — núcleo criptográfico
-
-Es el componente más importante del proyecto. Gestiona el ciclo de vida completo de las claves y las operaciones
-criptográficas usando la **Java Cryptography Architecture (JCA)**.
-
-#### Almacén de claves en memoria
-
-```java
-private final Map<String, KeyPairEntry> keyStore = new ConcurrentHashMap<>();
-
-private record KeyPairEntry(KeyPair keyPair, String algorithm) {}
-```
-
-Cada par de claves generado se guarda en un `ConcurrentHashMap` indexado por un UUID (`keyId`). Se usa
-`ConcurrentHashMap` para garantizar seguridad ante accesos concurrentes. El `record` interno `KeyPairEntry` agrupa el
-`KeyPair` con el algoritmo que le corresponde, evitando que se intente verificar con un algoritmo distinto al que se usó
-para firmar.
-
-> **Limitación importante:** este almacén es volátil. Si el servidor se reinicia, todos los `keyId` dejan de existir y
-> los certificados emitidos no podrán verificarse.
-
-#### Generación de claves
-
-```java
-KeyPairGenerator kpg = KeyPairGenerator.getInstance(
-    normalizedAlgorithm.equals(ED25519) ? "Ed25519" : "EC"
-);
-
-if (!normalizedAlgorithm.equals(ED25519)) {
-    kpg.initialize(new ECGenParameterSpec("secp256r1"));
+```json
+{
+  "valid": true,
+  "firmaExtraible": true,
+  "byteRangeValido": true,
+  "cmsParseable": true,
+  "certificadoExtraible": true,
+  "firmaValida": true,
+  "certificadoVigente": true,
+  "subject": "CN=SecureSign Institucional, O=Universidad, C=PE",
+  "validoDesde": "2026-05-30T12:00:00Z",
+  "validoHasta": "2027-05-30T12:00:00Z",
+  "algoritmoFirma": "SHA256withECDSA",
+  "razon": null
 }
 ```
 
-Para **Ed25519** se instancia el generador directamente con ese nombre (la curva ya está fija en el estándar). Para *
-*ECDSA** se usa el generador `"EC"` y se especifica explícitamente la curva `secp256r1` (también conocida como P-256),
-que es la curva estándar de 256 bits del NIST.
-
-#### Firma y verificación
-
-```java
-// Firma
-Signature sig = Signature.getInstance(signatureAlgorithm(normalizeAlgorithm(algorithm)));
-sig.initSign(entry.keyPair().getPrivate());
-sig.update(data);
-return sig.sign();
-
-// Verificación
-sig.initVerify(entry.keyPair().getPublic());
-sig.update(data);
-return sig.verify(firma);
-```
-
-El algoritmo de firma que se pasa a la JCA depende del tipo de clave:
-
-| Clave   | Algoritmo JCA       |
-|---------|---------------------|
-| Ed25519 | `"Ed25519"`         |
-| ECDSA   | `"SHA256withECDSA"` |
-
-Para ECDSA el algoritmo incluye el hash (`SHA-256`) porque ECDSA solo firma hashes, no datos crudos. Ed25519 hace el
-hash internamente, por eso no se especifica.
-
-#### Normalización de algoritmos
-
-```java
-return switch (algorithm.toUpperCase()) {
-    case "ED25519"       -> ED25519;
-    case "ECDSA", "EC"   -> ECDSA;
-    default -> throw new IllegalArgumentException("Algoritmo no soportado: " + algorithm);
-};
-```
-
-Permite que el cliente envíe `"Ed25519"`, `"ED25519"`, `"ECDSA"` o `"EC"` indistintamente, evitando errores por
-capitalización.
-
----
-
-### `CertificateService` — emisión y verificación de certificados
-
-Orquesta la generación de un PDF institucional y su firma digital.
-
-#### Emisión
-
-```java
-byte[] pdfBytes = generarCertificadoPDF(nombre, dni, tipo, fecha);
-
-String keyId = signatureService.generateKeyPair(algorithm);
-byte[] firma = signatureService.sign(keyId, algorithm, pdfBytes);
-
-signatureStore.put(keyId, firma);
-```
-
-El flujo es:
-
-1. Generar el PDF con PDFBox.
-2. Generar un par de claves nuevo (exclusivo para este certificado).
-3. Firmar los bytes del PDF con la clave privada.
-4. Guardar la firma en `signatureStore` asociada al `keyId`.
-5. Devolver el PDF al cliente junto con el `keyId` en el header `X-Key-Id`.
-
-Cada certificado tiene su propio par de claves, lo que significa que un `keyId` identifica de forma única tanto la clave
-como el certificado que firmó.
-
-#### Verificación
-
-```java
-byte[] firmaOriginal = signatureStore.get(keyId);
-if (firmaOriginal == null) return false;
-return signatureService.verify(keyId, algorithm, pdfBytes, firmaOriginal);
-```
-
-Se recupera la firma original del `signatureStore` y se verifica contra los bytes del PDF recibido. Si el PDF fue
-modificado después de emitirse, los bytes serán distintos y la verificación fallará.
-
-#### Generación del PDF con PDFBox
-
-```java
-PDDocument document = new PDDocument();
-PDPage page = new PDPage(PDRectangle.A4);
-document.addPage(page);
-
-try (PDPageContentStream content = new PDPageContentStream(document, page)) {
-    content.beginText();
-    content.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD), 20);
-    content.newLineAtOffset(100, 750);
-    content.showText("CERTIFICADO INSTITUCIONAL");
-    // ...
-}
-```
-
-PDFBox trabaja con un sistema de coordenadas donde el origen `(0, 0)` está en la esquina inferior izquierda de la
-página. El título se posiciona a `(100, 750)` en una página A4 que mide 595 × 842 puntos. Los campos del certificado se
-van desplazando con `newLineAtOffset(0, -25)` para espaciarlos verticalmente.
-
----
-
-### `WebConfig` — CORS
-
-```java
-registry.addMapping("/api/**")
-    .allowedOrigins("http://localhost:5173", "http://localhost:5500", "http://127.0.0.1:5500")
-    .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
-    .allowedHeaders("*")
-    .exposedHeaders("X-Key-Id", "X-Algorithm");
-```
-
-La línea `.exposedHeaders(...)` es crítica: por defecto los navegadores no permiten que el JavaScript del frontend lea
-headers personalizados de la respuesta a menos que el servidor los exponga explícitamente. Sin esta línea el frontend no
-podría leer el `X-Key-Id` del certificado generado.
-
----
-
-### Manejo de errores — `GlobalExceptionHandler`
-
-```java
-@RestControllerAdvice
-public class GlobalExceptionHandler {
-
-    @ExceptionHandler(KeyNotFoundException.class)
-    public ResponseEntity<Map<String, String>> handleKeyNotFound(KeyNotFoundException ex) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(Map.of("error", ex.getMessage()));
-    }
-
-    @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<Map<String, String>> handleIllegalArgument(IllegalArgumentException ex) {
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(...);
-    }
-}
-```
-
-`@RestControllerAdvice` intercepta excepciones lanzadas desde cualquier controlador y las convierte en respuestas JSON
-estructuradas con el código HTTP adecuado, en lugar de devolver el stacktrace por defecto de Spring.
-`KeyNotFoundException` se lanza desde `SignatureService` cuando se consulta un `keyId` inexistente y se mapea a
-`404 Not Found`.
-
----
-
-### Modelos — Records de Java
-
-Todos los DTOs del proyecto usan `record` de Java 16+:
-
-```java
-public record SignRequest(String keyId, String algorithm, String data) {}
-```
-
-Los records son clases inmutables que generan automáticamente constructor, getters, `equals`, `hashCode` y `toString`.
-Son ideales para objetos de transferencia de datos donde no se necesita mutabilidad. Spring los deserializa desde JSON
-sin configuración adicional.
+El campo `razon` contiene el motivo del fallo cuando `valid` es `false`.
 
 ---
 
 ## Algoritmos soportados
 
-| Nombre en la API | Algoritmo JCA     | Hash              |
-|------------------|-------------------|-------------------|
-| `Ed25519`        | `Ed25519`         | Interno (SHA-512) |
-| `ECDSA` / `EC`   | `SHA256withECDSA` | SHA-256 externo   |
+| Valor en API | Curva / Estándar  | Algoritmo de firma | Hash            |
+|--------------|-------------------|--------------------|-----------------|
+| `EC`         | secp256r1 (P-256) | SHA256withECDSA    | SHA-256 externo |
+| `Ed25519`    | Curve25519        | EdDSA              | SHA-512 interno |
 
 ---
 
-## Consideraciones
+## Arquitectura y flujo
 
-- Las claves y firmas se almacenan **solo en memoria**. No persisten entre reinicios.
-- La firma del certificado PDF no se embebe en la estructura interna del PDF; se almacena en el servidor asociada al
-  `keyId`. Si el servidor se reinicia, los certificados emitidos no pueden verificarse.
-- Para un entorno de producción sería necesario persistir el `keyStore` y el `signatureStore` en base de datos o HSM.
+### Firma (`/generate`)
+
+```
+HTTP multipart/form-data (PDF + algorithm)
+  └─► DocumentController.generate()  →  POST /api/documents/signed
+        └─► DocumentService.firmarDocumento()
+              ├─► KeyManagementService.generarYAlmacenarParDeClaves()
+              │     ├─► KeyPairGenerator (EC secp256r1 o Ed25519)
+              │     ├─► CertificateX509Service.generarCertificadoX509()   ← cert autofirmado X.509v3
+              │     └─► KeyStoreService.guardar()                         ← persiste en PKCS#12
+              └─► SignatureService.firmarPdf()
+                    └─► DSS PAdESService.signDocument()                   ← firma PAdES Baseline-B
+                          └─► PDFBox 3.x saveIncremental()                ← ByteRange correcto
+```
+
+Cada operación de firma genera un nuevo par de claves con su propio certificado X.509 autofirmado. El par se persiste en
+el KeyStore PKCS#12 en disco y sobrevive a reinicios.
+
+### Verificación (`/verify`)
+
+```
+HTTP multipart/form-data (PDF firmado)
+  └─► DocumentController.verify()
+        └─► VerificationService.verificarDocumentoFirmado()
+              ├─► ByteRangeExtractor.extraer()          ← parsea /ByteRange y /Contents del PDF
+              ├─► CMSSignedData (BouncyCastle)           ← parsea el bloque CMS DER
+              ├─► JcaX509CertificateConverter            ← extrae el cert X.509 embebido
+              └─► SignerInformation.verify()             ← verifica la firma criptográfica
+```
+
+La verificación es completamente **offline**: no contacta ninguna CA ni servicio de revocación externo.
+
+### Descripción detallada de campos en `VerificationResultResponse`
+
+| Campo                  | Significado                                                                       |
+|------------------------|-----------------------------------------------------------------------------------|
+| `valid`                | Resultado global: `true` solo si `firmaValida && certificadoVigente`              |
+| `firmaExtraible`       | Se encontró y extrajo el bloque `/Contents` del PDF                               |
+| `byteRangeValido`      | El `/ByteRange` cubre exactamente los bytes fuera del bloque de firma             |
+| `cmsParseable`         | El bloque DER en `/Contents` es un `CMSSignedData` válido                         |
+| `certificadoExtraible` | El CMS contiene al menos un certificado X.509                                     |
+| `firmaValida`          | El hash del documento coincide con el valor de firma (verificación criptográfica) |
+| `certificadoVigente`   | El certificado no ha expirado en el momento de la verificación                    |
+| `algoritmoFirma`       | OID resuelto al nombre legible (ej. `SHA256withECDSA`, `Ed25519`)                 |
+
+---
+
+## Notas técnicas
+
+**PDFBox 3.x es obligatorio.** PDFBox 2.x calcula los offsets del `ByteRange` antes de serializar el xref, lo que
+provoca desalineación de 1–4 bytes en el bloque `/Contents`. Resultado: `ByteRange invalid` en Adobe Acrobat. DSS 6.x
+usa exclusivamente la API de PDFBox 3.x.
+
+**BOM de DSS antes de BouncyCastle.** El BOM `dss-bom` gestiona la versión de `bcprov-jdk18on`. Mezclar `bcprov-jdk15on`
+y `bcprov-jdk18on` en el classpath causa `ClassNotFoundException` en runtime.
+
+**`CommonCertificateVerifier` sin revocación.** La firma se realiza sin consultar OCSP ni CRL, adecuado para
+certificados autofirmados en entornos de desarrollo y universitarios.
+
+---
+
+## Tests de integración
+
+`FirmaVerificacionTest` cubre cuatro escenarios sin contexto Spring:
+
+| Test      | Descripción                                                          |
+|-----------|----------------------------------------------------------------------|
+| Estado 0  | PDF firmado → verificación válida (EC secp256r1)                     |
+| Estado 1  | PDF modificado post-firma → `firmaValida: false`, estructura intacta |
+| Sin firma | PDF sin firma → detectado como `firmaExtraible: false`               |
+| Ed25519   | PDF firmado con Ed25519 → verificación válida                        |
+
+```bash
+./mvnw test
+```

@@ -17,7 +17,7 @@ async function apiGenerateDocument(file, algorithm) {
     formData.append('file', file);
     formData.append('algorithm', algorithm);
 
-    const response = await fetch(`${API_BASE}/generate`, {
+    const response = await fetch(`${API_BASE}/sign`, {
         method: 'POST',
         body: formData,
     });

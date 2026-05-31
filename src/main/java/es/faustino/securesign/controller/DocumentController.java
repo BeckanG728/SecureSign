@@ -22,7 +22,7 @@ public class DocumentController {
         this.verificationService = verificationService;
     }
 
-    @PostMapping("/generate")
+    @PostMapping("/sign")
     public ResponseEntity<byte[]> generate(
             @RequestParam("file") MultipartFile file,
             @RequestParam(value = "algorithm", defaultValue = "EC") String algorithm) throws Exception {
