@@ -13,9 +13,8 @@ src/main/java/es/faustino/securesign/
 │   ├── CryptoIdentityService.java            ← aprovisionamiento de identidades (keypair + cert)
 │   └── KeyStoreAccessService.java            ← I/O sobre el archivo .p12
 ├── services/
-│   ├── document/DocumentService.java         ← orquestador de firma
-│   ├── signature/SignatureService.java       ← firma PAdES via DSS
-│   └── verification/VerificationService.java ← pipeline de verificación
+│   ├── SignatureService.java                 ← orquestación y firma PAdES via DSS
+│   └── VerificationService.java              ← pipeline de verificación
 ├── shared/
 │   ├── util/
 │   │   ├── ByteRangeExtractor.java           ← extracción de ByteRange y CMS del PDF
@@ -38,11 +37,14 @@ src/main/java/es/faustino/securesign/
 **Método:** `generarCertificadoX509(KeyPair keyPair, String algoritmo)`  
 **Librería:** BouncyCastle (`bcpkix-jdk18on`)
 
-Este proceso ocurre **una sola vez por algoritmo** al arrancar la aplicación, siempre que el alias correspondiente no exista ya en el `.p12`. No se vuelve a ejecutar mientras el archivo persista en disco.
+Este proceso ocurre **una sola vez por algoritmo** al arrancar la aplicación, siempre que el alias correspondiente no
+exista ya en el `.p12`. No se vuelve a ejecutar mientras el archivo persista en disco.
 
 ### ¿Qué es un certificado X.509v3?
 
-Un certificado X.509v3 es una estructura ASN.1 firmada (`TBSCertificate` + firma del emisor) que vincula una clave pública con una identidad. En SecureSign el certificado es **autofirmado**: el emisor y el sujeto son la misma entidad, y la clave privada del par recién generado firma el propio certificado.
+Un certificado X.509v3 es una estructura ASN.1 firmada (`TBSCertificate` + firma del emisor) que vincula una clave
+pública con una identidad. En SecureSign el certificado es **autofirmado**: el emisor y el sujeto son la misma entidad,
+y la clave privada del par recién generado firma el propio certificado.
 
 ```
 TBSCertificate {
@@ -61,48 +63,66 @@ signature: firmado con la clave privada del mismo par
 
 #### 1. Construcción del TBSCertificate
 
-`JcaX509v3CertificateBuilder` acepta sujeto, número de serie, rango de fechas e issuer. Construye el bloque `TBSCertificate` en ASN.1 sin firmarlo todavía. El subject es una constante estática del servicio:
+`JcaX509v3CertificateBuilder` acepta sujeto, número de serie, rango de fechas e issuer. Construye el bloque
+`TBSCertificate` en ASN.1 sin firmarlo todavía. El subject es una constante estática del servicio:
 
 ```java
 private static final X500Name SUBJECT =
         new X500Name("CN=Equipo-01 SecureSign, OU=Criptografia II, O=SecureSign, C=PE");
 ```
 
-El número de serie se genera con `new BigInteger(128, new SecureRandom())`, suficientemente grande para ser globalmente único sin un contador centralizado.
+El número de serie se genera con `new BigInteger(128, new SecureRandom())`, suficientemente grande para ser globalmente
+único sin un contador centralizado.
 
 #### 2. Adición de extensiones X.509v3
 
 ```java
 JcaX509ExtensionUtils extUtils = new JcaX509ExtensionUtils();
 
-builder.addExtension(Extension.subjectKeyIdentifier, false,
-        extUtils.createSubjectKeyIdentifier(keyPair.getPublic()));
-builder.addExtension(Extension.authorityKeyIdentifier, false,
-        extUtils.createAuthorityKeyIdentifier(keyPair.getPublic()));
-builder.addExtension(Extension.keyUsage, true,
-        new KeyUsage(KeyUsage.digitalSignature | KeyUsage.nonRepudiation));
-builder.addExtension(Extension.basicConstraints, true,
+builder.
+
+addExtension(Extension.subjectKeyIdentifier, false,
+             extUtils.createSubjectKeyIdentifier(keyPair.getPublic()));
+        builder.
+
+addExtension(Extension.authorityKeyIdentifier, false,
+             extUtils.createAuthorityKeyIdentifier(keyPair.getPublic()));
+        builder.
+
+addExtension(Extension.keyUsage, true,
+        new KeyUsage(KeyUsage.digitalSignature|KeyUsage.nonRepudiation));
+        builder.
+
+addExtension(Extension.basicConstraints, true,
         new BasicConstraints(false));
 ```
 
-| Extensión | Crítica | Valor | Propósito |
-|---|---|---|---|
-| `SubjectKeyIdentifier` | No | hash SHA-1 de la clave pública | Identifica la clave en cadenas de certificados |
-| `AuthorityKeyIdentifier` | No | mismo hash (autofirmado) | Enlaza con el emisor |
-| `KeyUsage` | Sí | `digitalSignature \| nonRepudiation` | Limita el uso legítimo del certificado |
-| `BasicConstraints` | Sí | `false` (no es CA) | Impide que se use para firmar otros certificados |
+| Extensión                | Crítica | Valor                                | Propósito                                        |
+|--------------------------|---------|--------------------------------------|--------------------------------------------------|
+| `SubjectKeyIdentifier`   | No      | hash SHA-1 de la clave pública       | Identifica la clave en cadenas de certificados   |
+| `AuthorityKeyIdentifier` | No      | mismo hash (autofirmado)             | Enlaza con el emisor                             |
+| `KeyUsage`               | Sí      | `digitalSignature \| nonRepudiation` | Limita el uso legítimo del certificado           |
+| `BasicConstraints`       | Sí      | `false` (no es CA)                   | Impide que se use para firmar otros certificados |
 
 #### 3. Firma del TBSCertificate
 
 ```java
 String sigAlg = SignatureAlgorithm.fromJcaName(algoritmo).getJcaName();
 
-return new JcaX509CertificateConverter().getCertificate(
-        builder.build(new JcaContentSignerBuilder(sigAlg).build(keyPair.getPrivate()))
-);
+return new
+
+JcaX509CertificateConverter().
+
+getCertificate(
+        builder.build(new JcaContentSignerBuilder(sigAlg).
+
+build(keyPair.getPrivate()))
+        );
 ```
 
-`JcaContentSignerBuilder` crea un `ContentSigner` que envuelve la operación JCA de firma. Cuando se llama a `build()`, BouncyCastle:
+`JcaContentSignerBuilder` crea un `ContentSigner` que envuelve la operación JCA de firma. Cuando se llama a `build()`,
+BouncyCastle:
+
 1. Serializa el `TBSCertificate` a DER.
 2. Lo firma con la clave privada usando el algoritmo indicado.
 3. Empaqueta `TBSCertificate + algorithmIdentifier + signatureValue` en la estructura `Certificate` ASN.1 final.
@@ -118,11 +138,14 @@ return new JcaX509CertificateConverter().getCertificate(
 
 ### ¿Qué es un archivo PKCS#12?
 
-PKCS#12 (RFC 7292) es un contenedor binario protegido por contraseña que almacena claves privadas junto con sus certificados X.509 asociados. Internamente es una estructura ASN.1 con `SafeBags` cifrados con PBE (Password-Based Encryption) y una MAC de integridad sobre todo el contenido. La extensión habitual es `.p12`.
+PKCS#12 (RFC 7292) es un contenedor binario protegido por contraseña que almacena claves privadas junto con sus
+certificados X.509 asociados. Internamente es una estructura ASN.1 con `SafeBags` cifrados con PBE (Password-Based
+Encryption) y una MAC de integridad sobre todo el contenido. La extensión habitual es `.p12`.
 
 ### CryptoIdentityService — ciclo de vida de identidades
 
-Al arrancar la aplicación, `SecureSignApplication` invoca `inicializarIdentidades()`. Este método gestiona dos identidades, una por algoritmo de firma soportado:
+Al arrancar la aplicación, `SecureSignApplication` invoca `inicializarIdentidades()`. Este método gestiona dos
+identidades, una por algoritmo de firma soportado:
 
 ```java
 public void inicializarIdentidades() throws Exception {
@@ -133,19 +156,26 @@ public void inicializarIdentidades() throws Exception {
 }
 ```
 
-Si el alias ya existe en el `.p12`, se omite. Si no existe, se genera el par de claves, se construye el certificado X.509 y se inserta la entrada en el KeyStore:
+Si el alias ya existe en el `.p12`, se omite. Si no existe, se genera el par de claves, se construye el certificado
+X.509 y se inserta la entrada en el KeyStore:
 
 ```java
 KeyPair parDeClaves = algoritmo.generarParDeClaves();
 X509Certificate certificado = certificateX509Service.generarCertificadoX509(parDeClaves, algoritmo.getJcaName());
 
-keyStore.setKeyEntry(alias, parDeClaves.getPrivate(),
-        keyStoreAccessService.getClaveAccesoComoChars(), new Certificate[]{certificado});
+keyStore.
+
+setKeyEntry(alias, parDeClaves.getPrivate(),
+        keyStoreAccessService.
+
+getClaveAccesoComoChars(), new Certificate[]{certificado});
 ```
 
-`setKeyEntry` registra en memoria una entrada `KeyBag` que asocia la clave privada (cifrada con la contraseña), el certificado X.509 y el alias definido en la configuración (`${securesign.alias-ecdsa}`, `${securesign.alias-ed25519}`).
+`setKeyEntry` registra en memoria una entrada `KeyBag` que asocia la clave privada (cifrada con la contraseña), el
+certificado X.509 y el alias definido en la configuración (`${securesign.alias-ecdsa}`, `${securesign.alias-ed25519}`).
 
-`CryptoIdentityService` también expone `obtenerCertificado(SignatureAlgorithm)` y `resolverAlias(SignatureAlgorithm)`, usados por `DocumentService` para obtener el certificado correcto antes de firmar.
+`CryptoIdentityService` también expone `obtenerCertificado(SignatureAlgorithm)` y `resolverAlias(SignatureAlgorithm)`,
+usados por `SignatureService` para obtener el certificado correcto antes de firmar.
 
 ### KeyStoreAccessService — I/O sobre el archivo .p12
 
@@ -178,7 +208,9 @@ public synchronized void guardar(KeyStore keyStore) throws Exception {
 }
 ```
 
-`keyStore.store()` serializa el KeyStore completo en PKCS#12 DER: cifra cada `KeyBag` con PBE, opcionalmente los `CertBag`, y calcula una MAC HMAC-SHA1 sobre el contenido. El método es `synchronized` para evitar escrituras concurrentes.
+`keyStore.store()` serializa el KeyStore completo en PKCS#12 DER: cifra cada `KeyBag` con PBE, opcionalmente los
+`CertBag`, y calcula una MAC HMAC-SHA1 sobre el contenido. El método es `synchronized` para evitar escrituras
+concurrentes.
 
 #### Búsqueda de alias por certificado
 
@@ -196,22 +228,28 @@ public String buscarAliasPorCertificado(X509Certificate certificado) throws Exce
 }
 ```
 
-`SignatureService` usa este método para resolver el alias antes de abrir la conexión de token DSS. También expone `abrirConexionToken()` que retorna un `KeyStoreSignatureTokenConnection` para que DSS acceda a la clave privada.
+`SignatureService` usa este método para resolver el alias antes de abrir la conexión de token DSS. También expone
+`abrirConexionToken()` que retorna un `KeyStoreSignatureTokenConnection` para que DSS acceda a la clave privada.
 
 ---
 
 ## Proceso III — Firma del PDF (PAdES)
 
 **Archivo:** `services/signature/SignatureService.java`  
-**Método:** `firmarPdf(byte[] bytesPdf, X509Certificate certificado, String algoritmo)`  
+**Método público:** `firmarDocumento(byte[] bytesPdf, String jcaName)`  
 **Librerías:** EU DSS 6.4 (`dss-pades`, `dss-token`), PDFBox 3.x (interno en DSS)
+
+`SignatureService` concentra tanto la orquestación de la identidad criptográfica como la firma PAdES. El método público
+`firmarDocumento` resuelve el algoritmo, obtiene el certificado mediante `CryptoIdentityService` y delega en el método
+privado `firmarPdf`.
 
 ### Flujo general
 
 ```
-DocumentService.firmarDocumento()
-    └── CryptoIdentityService.obtenerCertificado(algoritmo)
-    └── SignatureService.firmarPdf(bytesPdf, certificado, algoritmo)
+SignatureService.firmarDocumento()
+    ├── SignatureAlgorithm.fromJcaName()
+    ├── CryptoIdentityService.obtenerCertificado(algoritmo)
+    └── firmarPdf(bytesPdf, certificado, jcaName)
             ├── KeyStoreAccessService.buscarAliasPorCertificado()
             ├── KeyStoreAccessService.abrirConexionToken()
             ├── [Fase 1] servicioPades.getDataToSign()
@@ -226,11 +264,13 @@ ToBeSigned datosAFirmar = servicioPades.getDataToSign(documentoPdf, parametrosFi
 ```
 
 DSS + PDFBox internamente:
+
 1. Parsean el PDF de entrada.
 2. Estiman el tamaño del bloque CMS que se va a embeber.
 3. Añaden al PDF el diccionario `/Sig` con un `/Contents` de longitud fija relleno de ceros como placeholder.
 4. Calculan el `/ByteRange`: `[0, offsetAntesDeFirma, offsetDespuesDeFirma, longitudFinal]`.
-5. Devuelven como `ToBeSigned` los bytes del PDF **excluyendo** el placeholder de `/Contents`, que son exactamente los bytes que se van a hashear y firmar.
+5. Devuelven como `ToBeSigned` los bytes del PDF **excluyendo** el placeholder de `/Contents`, que son exactamente los
+   bytes que se van a hashear y firmar.
 
 ### Fase 2 — `conexionToken.sign`: firma criptográfica
 
@@ -242,7 +282,8 @@ SignatureValue valorFirma = conexionToken.sign(
 );
 ```
 
-`KeyStoreSignatureTokenConnection` lee la clave privada del PKCS#12 usando el alias y llama a `java.security.Signature` del JDK. El algoritmo de digest se resuelve desde el enum:
+`KeyStoreSignatureTokenConnection` lee la clave privada del PKCS#12 usando el alias y llama a `java.security.Signature`
+del JDK. El algoritmo de digest se resuelve desde el enum:
 
 ```java
 parametros.setDigestAlgorithm(SignatureAlgorithm.resolverDigestDss(algoritmo));
@@ -255,23 +296,31 @@ parametros.setDigestAlgorithm(SignatureAlgorithm.resolverDigestDss(algoritmo));
 DSSDocument documentoFirmado = servicioPades.signDocument(documentoPdf, parametrosFirma, valorFirma);
 ```
 
-DSS construye el bloque CMS (`SignedData`) real con el `SignerInfo`, los atributos firmados (`signingCertificate`, `contentType`, `messageDigest`) y el certificado X.509 embebido. PDFBox escribe ese bloque en el placeholder `/Contents` del PDF. El resultado es un PDF con firma PAdES Baseline-B completamente embebida.
+DSS construye el bloque CMS (`SignedData`) real con el `SignerInfo`, los atributos firmados (`signingCertificate`,
+`contentType`, `messageDigest`) y el certificado X.509 embebido. PDFBox escribe ese bloque en el placeholder `/Contents`
+del PDF. El resultado es un PDF con firma PAdES Baseline-B completamente embebida.
 
 ### Parámetros de firma configurados
 
 ```java
 parametros.setSignatureLevel(SignatureLevel.PAdES_BASELINE_B);
-parametros.setSignaturePackaging(SignaturePackaging.ENVELOPED);
-parametros.setSigningCertificate(entradaClave.getCertificate());
-parametros.setCertificateChain(entradaClave.getCertificateChain());
+parametros.
+
+setSignaturePackaging(SignaturePackaging.ENVELOPED);
+parametros.
+
+setSigningCertificate(entradaClave.getCertificate());
+        parametros.
+
+setCertificateChain(entradaClave.getCertificateChain());
 ```
 
-| Parámetro | Valor | Significado |
-|---|---|---|
-| `SignatureLevel` | `PAdES_BASELINE_B` | Firma básica sin sello de tiempo (ETSI EN 319 132) |
-| `SignaturePackaging` | `ENVELOPED` | La firma se embebe dentro del PDF |
-| `SigningCertificate` | cert de `CryptoIdentityService` | El certificado que identifica al firmante |
-| `CertificateChain` | solo el cert (autofirmado, sin CA) | Cadena embebida en el CMS |
+| Parámetro            | Valor                              | Significado                                        |
+|----------------------|------------------------------------|----------------------------------------------------|
+| `SignatureLevel`     | `PAdES_BASELINE_B`                 | Firma básica sin sello de tiempo (ETSI EN 319 132) |
+| `SignaturePackaging` | `ENVELOPED`                        | La firma se embebe dentro del PDF                  |
+| `SigningCertificate` | cert de `CryptoIdentityService`    | El certificado que identifica al firmante          |
+| `CertificateChain`   | solo el cert (autofirmado, sin CA) | Cadena embebida en el CMS                          |
 
 ---
 
@@ -300,7 +349,8 @@ verificarFirma()
             ↓ VerificationResultResponse
 ```
 
-Cada paso devuelve `null` en caso de fallo, y `VerificationService` cortocircuita el pipeline retornando el factory method apropiado de `VerificationResultResponse`.
+Cada paso devuelve `null` en caso de fallo, y `VerificationService` cortocircuita el pipeline retornando el factory
+method apropiado de `VerificationResultResponse`.
 
 ---
 
@@ -322,45 +372,60 @@ El `ByteRange` en el diccionario `/Sig` define las 4 coordenadas:
 #### 1a. Lectura del ByteRange con PDFBox
 
 ```java
-try (PDDocument documento = Loader.loadPDF(bytesPdf)) {
-    List<PDSignature> firmas = documento.getSignatureDictionaries();
-    if (firmas == null || firmas.isEmpty()) {
-        throw new PdfNoFirmadoException("El PDF no contiene ningún campo de firma (/Sig)");
+try(PDDocument documento = Loader.loadPDF(bytesPdf)){
+List<PDSignature> firmas = documento.getSignatureDictionaries();
+    if(firmas ==null||firmas.
+
+isEmpty()){
+        throw new
+
+PdfNoFirmadoException("El PDF no contiene ningún campo de firma (/Sig)");
     }
-    int[] byteRangeRaw = firmas.get(0).getByteRange();
+int[] byteRangeRaw = firmas.get(0).getByteRange();
     ...
-}
+            }
 ```
 
-PDFBox parsea la tabla xref del PDF y navega el árbol COS hasta el diccionario `/Sig`. Si no existe ningún campo de firma, se lanza `PdfNoFirmadoException`, que `VerificationService` captura y traduce a `firmaExtraible = false`.
+PDFBox parsea la tabla xref del PDF y navega el árbol COS hasta el diccionario `/Sig`. Si no existe ningún campo de
+firma, se lanza `PdfNoFirmadoException`, que `VerificationService` captura y traduce a `firmaExtraible = false`.
 
 #### 1b. Validación del ByteRange
 
 `validarByteRange` comprueba que:
+
 - `offsetTramo1 == 0` (el primer tramo empieza al inicio del archivo).
 - Los tramos no se solapan.
-- `offsetTramo2 + longitudTramo2 == longitudTotalPdf`. Si falla → `estructuraValida = false` (el archivo fue extendido después de firmarse).
+- `offsetTramo2 + longitudTramo2 == longitudTotalPdf`. Si falla → `estructuraValida = false` (el archivo fue extendido
+  después de firmarse).
 
 #### 1c. Ensamblado del contenido firmado
 
 ```java
-byte[] bytesPdfCubiertos = new byte[(int)(longitudTramo1 + longitudTramo2)];
+byte[] bytesPdfCubiertos = new byte[(int) (longitudTramo1 + longitudTramo2)];
 ByteBuffer ensamblador = ByteBuffer.wrap(bytesPdfCubiertos);
-ensamblador.put(bytesPdf, (int) offsetTramo1, (int) longitudTramo1);
-ensamblador.put(bytesPdf, (int) offsetTramo2, (int) longitudTramo2);
+ensamblador.
+
+put(bytesPdf, (int) offsetTramo1, (int)longitudTramo1);
+        ensamblador.
+
+put(bytesPdf, (int) offsetTramo2, (int)longitudTramo2);
 ```
 
-Los dos tramos se concatenan excluyendo `/Contents`. Cualquier modificación posterior al PDF producirá un hash diferente al verificar.
+Los dos tramos se concatenan excluyendo `/Contents`. Cualquier modificación posterior al PDF producirá un hash diferente
+al verificar.
 
 #### 1d. Extracción del bloque CMS
 
 ```java
 COSString bloqueContents = (COSString) firma.getCOSObject()
         .getDictionaryObject(COSName.CONTENTS);
-return bloqueContents.getBytes();
+return bloqueContents.
+
+getBytes();
 ```
 
-PDFBox extrae el valor de `/Contents` como `COSString`. Esos bytes son el bloque CMS en DER: firma criptográfica, certificado del firmante y atributos firmados.
+PDFBox extrae el valor de `/Contents` como `COSString`. Esos bytes son el bloque CMS en DER: firma criptográfica,
+certificado del firmante y atributos firmados.
 
 El resultado se empaqueta en `ResultadoExtraccion` (record en `dto/internal`).
 
@@ -380,7 +445,10 @@ public static CMSSignedData parsearCMS(byte[] bytesCMS, byte[] bytesPdfCubiertos
 }
 ```
 
-`ASN1InputStream` deserializa los bytes DER del `/Contents`. `ContentInfo.getInstance()` identifica la estructura como `SignedData` (OID `1.2.840.113549.1.7.2`). `new CMSSignedData(...)` combina la estructura CMS con el contenido firmado, permitiendo a BouncyCastle recalcular el hash de los bytes firmados al verificar. Si el DER está corrupto → `cmsParseable = false`.
+`ASN1InputStream` deserializa los bytes DER del `/Contents`. `ContentInfo.getInstance()` identifica la estructura como
+`SignedData` (OID `1.2.840.113549.1.7.2`). `new CMSSignedData(...)` combina la estructura CMS con el contenido firmado,
+permitiendo a BouncyCastle recalcular el hash de los bytes firmados al verificar. Si el DER está corrupto →
+`cmsParseable = false`.
 
 ---
 
@@ -400,12 +468,15 @@ public static X509Certificate convertirCertificado(X509CertificateHolder certHol
 }
 ```
 
-`cms.getCertificates().getMatches(null)` devuelve todos los certificados embebidos en el CMS; se toma el primero (hay uno en firmas de un solo firmante). `JcaX509CertificateConverter` convierte el `X509CertificateHolder` de BouncyCastle a `java.security.cert.X509Certificate` del JDK.
+`cms.getCertificates().getMatches(null)` devuelve todos los certificados embebidos en el CMS; se toma el primero (hay
+uno en firmas de un solo firmante). `JcaX509CertificateConverter` convierte el `X509CertificateHolder` de BouncyCastle a
+`java.security.cert.X509Certificate` del JDK.
 
 El resultado se empaqueta en `DatosCertificado` (record en `dto/internal`):
 
 ```java
-public record DatosCertificado(X509CertificateHolder certHolder, X509Certificate cert) {}
+public record DatosCertificado(X509CertificateHolder certHolder, X509Certificate cert) {
+}
 ```
 
 ---
@@ -426,7 +497,8 @@ public static SignerInformation buscarSignerParaCertificado(
 }
 ```
 
-`getSID().match(certHolder)` compara el `SignerIdentifier` del `SignerInfo` (por `IssuerAndSerialNumber` o `SubjectKeyIdentifier`) contra el certificado extraído.
+`getSID().match(certHolder)` compara el `SignerIdentifier` del `SignerInfo` (por `IssuerAndSerialNumber` o
+`SubjectKeyIdentifier`) contra el certificado extraído.
 
 #### 4b. Resolver el algoritmo de firma
 
@@ -434,25 +506,36 @@ public static SignerInformation buscarSignerParaCertificado(
 String algoritmo = SignatureAlgorithm.resolve(signerInfo.getEncryptionAlgOID());
 ```
 
-`getEncryptionAlgOID()` devuelve el OID declarado en el `SignerInfo` (p.ej. `1.3.101.112` para Ed25519). `SignatureAlgorithm.resolve()` lo mapea al nombre legible; si el OID no está en el enum, se devuelve el OID crudo como fallback.
+`getEncryptionAlgOID()` devuelve el OID declarado en el `SignerInfo` (p.ej. `1.3.101.112` para Ed25519).
+`SignatureAlgorithm.resolve()` lo mapea al nombre legible; si el OID no está en el enum, se devuelve el OID crudo como
+fallback.
 
 #### 4c. Verificación con BouncyCastle
 
 ```java
-firmaValida = signerInfo.verify(
+firmaValida =signerInfo.
+
+verify(
         new JcaSimpleSignerInfoVerifierBuilder()
-                .setProvider("BC")
-                .build(datosCert.certHolder())
-);
+                .
+
+setProvider("BC")
+                .
+
+build(datosCert.certHolder())
+        );
 ```
 
 BouncyCastle ejecuta internamente:
+
 1. Recalcula el hash de `bytesPdfCubiertos` con el algoritmo declarado en el `SignerInfo`.
 2. Compara ese hash con el `messageDigest` en los atributos firmados. Si difieren → `CMSException`.
 3. Descifra el valor de firma con la clave pública del certificado.
 4. Compara el resultado descifrado con el hash calculado. Si coinciden → `firmaValida = true`.
 
-Las excepciones se tratan por separado: `CMSException` indica firma inválida (documento modificado); `OperatorCreationException` o `CertificateException` indican un error interno al construir el verificador y se traducen al factory method `errorVerificacion`.
+Las excepciones se tratan por separado: `CMSException` indica firma inválida (documento modificado);
+`OperatorCreationException` o `CertificateException` indican un error interno al construir el verificador y se traducen
+al factory method `errorVerificacion`.
 
 ---
 
@@ -460,26 +543,27 @@ Las excepciones se tratan por separado: `CMSException` indica firma inválida (d
 
 **Archivo:** `dto/response/VerificationResultResponse.java`
 
-La respuesta se construye mediante factory methods estáticos del record. Cada método refleja el punto del pipeline donde se detuvo la verificación:
+La respuesta se construye mediante factory methods estáticos del record. Cada método refleja el punto del pipeline donde
+se detuvo la verificación:
 
-| Factory method | Condición |
-|---|---|
-| `sinFirma` | PDF sin campo `/Sig` |
-| `cmsCorrupto` | `/Contents` no parseable |
-| `sinCertificado` | CMS sin certificado embebido |
-| `sinFirmante` | CMS sin `SignerInfo` o sin correspondencia con el cert |
-| `firmaInvalida` | Hash o firma criptográfica no coinciden |
-| `firmaVerificada` | Firma y certificado correctos |
-| `errorVerificacion` | Error interno al preparar el verificador |
+| Factory method      | Condición                                              |
+|---------------------|--------------------------------------------------------|
+| `sinFirma`          | PDF sin campo `/Sig`                                   |
+| `cmsCorrupto`       | `/Contents` no parseable                               |
+| `sinCertificado`    | CMS sin certificado embebido                           |
+| `sinFirmante`       | CMS sin `SignerInfo` o sin correspondencia con el cert |
+| `firmaInvalida`     | Hash o firma criptográfica no coinciden                |
+| `firmaVerificada`   | Firma y certificado correctos                          |
+| `errorVerificacion` | Error interno al preparar el verificador               |
 
 El campo `valido` es `true` únicamente si `firmaValida && certificadoVigente`.
 
-| Flag | `true` cuando… | `false` indica… |
-|---|---|---|
-| `firmaExtraible` | El PDF contiene `/Sig` con `/Contents` | PDF sin firmar o estructura rota |
-| `estructuraValida` | `offset2 + longitud2 == tamañoPDF` | El archivo fue extendido tras la firma |
-| `cmsParseable` | El DER en `/Contents` es un `SignedData` válido | `/Contents` corrupto o truncado |
-| `certificadoExtraible` | El CMS contiene un certificado X.509 convertible | CMS sin certificado embebido |
-| `firmaValida` | El hash recalculado coincide con la firma | El documento fue modificado |
-| `certificadoVigente` | La fecha actual está dentro de `[notBefore, notAfter]` | El certificado expiró |
-| `valido` | `firmaValida && certificadoVigente` | Cualquiera de los dos anteriores |
+| Flag                   | `true` cuando…                                         | `false` indica…                        |
+|------------------------|--------------------------------------------------------|----------------------------------------|
+| `firmaExtraible`       | El PDF contiene `/Sig` con `/Contents`                 | PDF sin firmar o estructura rota       |
+| `estructuraValida`     | `offset2 + longitud2 == tamañoPDF`                     | El archivo fue extendido tras la firma |
+| `cmsParseable`         | El DER en `/Contents` es un `SignedData` válido        | `/Contents` corrupto o truncado        |
+| `certificadoExtraible` | El CMS contiene un certificado X.509 convertible       | CMS sin certificado embebido           |
+| `firmaValida`          | El hash recalculado coincide con la firma              | El documento fue modificado            |
+| `certificadoVigente`   | La fecha actual está dentro de `[notBefore, notAfter]` | El certificado expiró                  |
+| `valido`               | `firmaValida && certificadoVigente`                    | Cualquiera de los dos anteriores       |
