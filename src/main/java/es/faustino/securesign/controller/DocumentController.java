@@ -1,8 +1,8 @@
 package es.faustino.securesign.controller;
 
 import es.faustino.securesign.dto.response.VerificationResultResponse;
-import es.faustino.securesign.services.document.DocumentService;
-import es.faustino.securesign.services.verification.VerificationService;
+import es.faustino.securesign.services.SignatureService;
+import es.faustino.securesign.services.VerificationService;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -16,12 +16,12 @@ import org.springframework.web.multipart.MultipartFile;
 @RequestMapping("/api/documents")
 public class DocumentController {
 
-    private final DocumentService documentService;
+    private final SignatureService signatureService;
     private final VerificationService verificationService;
 
-    public DocumentController(DocumentService documentService,
+    public DocumentController(SignatureService signatureService,
                               VerificationService verificationService) {
-        this.documentService = documentService;
+        this.signatureService = signatureService;
         this.verificationService = verificationService;
     }
 
@@ -30,7 +30,7 @@ public class DocumentController {
             @RequestParam("file") MultipartFile file,
             @RequestParam(value = "algorithm") String algoritmo) throws Exception {
 
-        byte[] pdfFirmado = documentService.firmarDocumento(file.getBytes(), algoritmo);
+        byte[] pdfFirmado = signatureService.firmarDocumento(file.getBytes(), algoritmo);
         String nombreArchivo = construirNombreArchivo(file.getOriginalFilename());
 
         return ResponseEntity.ok()

@@ -1,165 +1,152 @@
-/**
- * app.js
- * Lógica principal: tabs, event listeners, orquestación.
- * Depende de: api.js, ui.js
- */
-
 document.addEventListener('DOMContentLoaded', () => {
 
-    // ── Tabs ──────────────────────────────────────────────────────────────────
-    const navItems = document.querySelectorAll('.nav-item');
-    const tabPanels = document.querySelectorAll('.tab-panel');
+    const elementosNav = document.querySelectorAll('.nav-item');
+    const panelesPestana = document.querySelectorAll('.tab-panel');
 
-    navItems.forEach(item => {
+    elementosNav.forEach(item => {
         item.addEventListener('click', () => {
-            const target = item.dataset.tab;
-            navItems.forEach(n => n.classList.remove('active'));
-            tabPanels.forEach(p => p.classList.remove('active'));
+            const destino = item.dataset.tab;
+            elementosNav.forEach(n => n.classList.remove('active'));
+            panelesPestana.forEach(p => p.classList.remove('active'));
             item.classList.add('active');
-            document.getElementById('tab-' + target).classList.add('active');
+            document.getElementById('tab-' + destino).classList.add('active');
         });
     });
 
-    // ── Elementos: Firmar ─────────────────────────────────────────────────────
-    const btnGenerate      = document.getElementById('btn-generate');
-    const generateStatus   = document.getElementById('generate-status');
-    const fileInputSign    = document.getElementById('file-input-sign');
-    const fileSelectedSign = document.getElementById('file-selected-sign');
-    const fileNameSign     = document.getElementById('file-name-sign');
-    const btnClearSign     = document.getElementById('btn-clear-sign');
-    const dropZoneSign     = document.getElementById('drop-zone-sign');
+    const btnGenerar              = document.getElementById('btn-generate');
+    const estadoGenerar           = document.getElementById('generate-status');
+    const inputArchivoFirma       = document.getElementById('file-input-sign');
+    const archivoSeleccionadoFirma = document.getElementById('file-selected-sign');
+    const nombreArchivoFirma      = document.getElementById('file-name-sign');
+    const btnLimpiarFirma         = document.getElementById('btn-clear-sign');
+    const zonaArrastreFirma       = document.getElementById('drop-zone-sign');
 
-    // ── Elementos: Verificar ──────────────────────────────────────────────────
-    const btnVerify      = document.getElementById('btn-verify');
-    const verifyResult   = document.getElementById('verify-result');
-    const fileInput      = document.getElementById('file-input');
-    const fileSelected   = document.getElementById('file-selected');
-    const fileNameEl     = document.getElementById('file-name');
-    const btnClearFile   = document.getElementById('btn-clear-file');
-    const dropZone       = document.getElementById('drop-zone');
+    const btnVerificar             = document.getElementById('btn-verify');
+    const resultadoVerificacion    = document.getElementById('verify-result');
+    const inputArchivo             = document.getElementById('file-input');
+    const archivoSeleccionado      = document.getElementById('file-selected');
+    const nombreArchivoEl          = document.getElementById('file-name');
+    const btnLimpiarArchivo        = document.getElementById('btn-clear-file');
+    const zonaArrastre             = document.getElementById('drop-zone');
 
-    // ── Drop-zone: Firmar ─────────────────────────────────────────────────────
-    let selectedFileSign = null;
+    let archivoFirmaSeleccionado = null;
 
-    dropZoneSign.addEventListener('dragover', e => {
+    zonaArrastreFirma.addEventListener('dragover', e => {
         e.preventDefault();
-        dropZoneSign.classList.add('drag-over');
+        zonaArrastreFirma.classList.add('drag-over');
     });
-    dropZoneSign.addEventListener('dragleave', () => dropZoneSign.classList.remove('drag-over'));
-    dropZoneSign.addEventListener('drop', e => {
+    zonaArrastreFirma.addEventListener('dragleave', () => zonaArrastreFirma.classList.remove('drag-over'));
+    zonaArrastreFirma.addEventListener('drop', e => {
         e.preventDefault();
-        dropZoneSign.classList.remove('drag-over');
-        const file = e.dataTransfer.files[0];
-        if (file && file.type === 'application/pdf') handleFileSignSelected(file);
+        zonaArrastreFirma.classList.remove('drag-over');
+        const archivo = e.dataTransfer.files[0];
+        if (archivo && archivo.type === 'application/pdf') alSeleccionarArchivoFirma(archivo);
     });
-    fileInputSign.addEventListener('change', () => {
-        if (fileInputSign.files[0]) handleFileSignSelected(fileInputSign.files[0]);
+    inputArchivoFirma.addEventListener('change', () => {
+        if (inputArchivoFirma.files[0]) alSeleccionarArchivoFirma(inputArchivoFirma.files[0]);
     });
-    btnClearSign.addEventListener('click', e => {
+    btnLimpiarFirma.addEventListener('click', e => {
         e.stopPropagation();
-        clearFileSign();
+        limpiarArchivoFirma();
     });
 
-    function handleFileSignSelected(file) {
-        selectedFileSign = file;
-        fileNameSign.textContent = file.name;
-        fileSelectedSign.classList.remove('hidden');
-        btnGenerate.disabled = false;
-        hideElement(generateStatus);
-        generateStatus.className = 'status-msg hidden';
+    function alSeleccionarArchivoFirma(archivo) {
+        archivoFirmaSeleccionado = archivo;
+        nombreArchivoFirma.textContent = archivo.name;
+        archivoSeleccionadoFirma.classList.remove('hidden');
+        btnGenerar.disabled = false;
+        hideElement(estadoGenerar);
+        estadoGenerar.className = 'status-msg hidden';
     }
 
-    function clearFileSign() {
-        selectedFileSign = null;
-        fileInputSign.value = '';
-        fileSelectedSign.classList.add('hidden');
-        btnGenerate.disabled = true;
-        hideElement(generateStatus);
-        generateStatus.className = 'status-msg hidden';
+    function limpiarArchivoFirma() {
+        archivoFirmaSeleccionado = null;
+        inputArchivoFirma.value = '';
+        archivoSeleccionadoFirma.classList.add('hidden');
+        btnGenerar.disabled = true;
+        hideElement(estadoGenerar);
+        estadoGenerar.className = 'status-msg hidden';
     }
 
-    // ── Drop-zone: Verificar ──────────────────────────────────────────────────
-    let selectedFile = null;
+    let archivoVerificacionSeleccionado = null;
 
-    dropZone.addEventListener('dragover', e => {
+    zonaArrastre.addEventListener('dragover', e => {
         e.preventDefault();
-        dropZone.classList.add('drag-over');
+        zonaArrastre.classList.add('drag-over');
     });
-    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
-    dropZone.addEventListener('drop', e => {
+    zonaArrastre.addEventListener('dragleave', () => zonaArrastre.classList.remove('drag-over'));
+    zonaArrastre.addEventListener('drop', e => {
         e.preventDefault();
-        dropZone.classList.remove('drag-over');
-        const file = e.dataTransfer.files[0];
-        if (file && file.type === 'application/pdf') handleFileSelected(file);
+        zonaArrastre.classList.remove('drag-over');
+        const archivo = e.dataTransfer.files[0];
+        if (archivo && archivo.type === 'application/pdf') alSeleccionarArchivo(archivo);
     });
-    fileInput.addEventListener('change', () => {
-        if (fileInput.files[0]) handleFileSelected(fileInput.files[0]);
+    inputArchivo.addEventListener('change', () => {
+        if (inputArchivo.files[0]) alSeleccionarArchivo(inputArchivo.files[0]);
     });
-    btnClearFile.addEventListener('click', e => {
+    btnLimpiarArchivo.addEventListener('click', e => {
         e.stopPropagation();
-        clearFile();
+        limpiarArchivo();
     });
 
-    function handleFileSelected(file) {
-        selectedFile = file;
-        fileNameEl.textContent = file.name;
-        fileSelected.classList.remove('hidden');
-        btnVerify.disabled = false;
-        hideElement(verifyResult);
-        verifyResult.className = 'verify-result hidden';
+    function alSeleccionarArchivo(archivo) {
+        archivoVerificacionSeleccionado = archivo;
+        nombreArchivoEl.textContent = archivo.name;
+        archivoSeleccionado.classList.remove('hidden');
+        btnVerificar.disabled = false;
+        hideElement(resultadoVerificacion);
+        resultadoVerificacion.className = 'verify-result hidden';
     }
 
-    function clearFile() {
-        selectedFile = null;
-        fileInput.value = '';
-        fileSelected.classList.add('hidden');
-        btnVerify.disabled = true;
-        hideElement(verifyResult);
-        verifyResult.className = 'verify-result hidden';
+    function limpiarArchivo() {
+        archivoVerificacionSeleccionado = null;
+        inputArchivo.value = '';
+        archivoSeleccionado.classList.add('hidden');
+        btnVerificar.disabled = true;
+        hideElement(resultadoVerificacion);
+        resultadoVerificacion.className = 'verify-result hidden';
     }
 
-    // ── Firmar documento ──────────────────────────────────────────────────────
-    btnGenerate.addEventListener('click', async () => {
-        if (!selectedFileSign) return;
+    btnGenerar.addEventListener('click', async () => {
+        if (!archivoFirmaSeleccionado) return;
 
-        const algorithm = document.querySelector('input[name="algorithm"]:checked').value;
+        const algoritmo = document.querySelector('input[name="algorithm"]:checked').value;
 
-        setButtonLoading(btnGenerate, true, 'Firmando...', 'Firmar y descargar PDF', 'ti-pen');
-        showStatus(generateStatus, 'loading', 'Firmando documento, por favor espera…');
+        setButtonLoading(btnGenerar, true, 'Firmando...', 'Firmar y descargar PDF', 'ti-pen');
+        showStatus(estadoGenerar, 'loading', 'Firmando documento, por favor espera…');
 
         try {
-            const blob = await apiGenerateDocument(selectedFileSign, algorithm);
-            const nombreFirmado = selectedFileSign.name.replace(/\.pdf$/i, '_firmado.pdf');
+            const blob = await firmarDocumento(archivoFirmaSeleccionado, algoritmo);
+            const nombreFirmado = archivoFirmaSeleccionado.name.replace(/\.pdf$/i, '_firmado.pdf');
             downloadBlob(blob, nombreFirmado);
-            showStatus(generateStatus, 'success', 'Documento firmado y descargado correctamente.');
+            showStatus(estadoGenerar, 'success', 'Documento firmado y descargado correctamente.');
         } catch (error) {
-            showStatus(generateStatus, 'error', 'Error: ' + error.message);
+            showStatus(estadoGenerar, 'error', 'Error: ' + error.message);
         } finally {
-            setButtonLoading(btnGenerate, false, '', 'Firmar y descargar PDF', 'ti-pen');
+            setButtonLoading(btnGenerar, false, '', 'Firmar y descargar PDF', 'ti-pen');
         }
     });
 
-    // ── Verificar documento ───────────────────────────────────────────────────
-    btnVerify.addEventListener('click', async () => {
-        if (!selectedFile) return;
+    btnVerificar.addEventListener('click', async () => {
+        if (!archivoVerificacionSeleccionado) return;
 
-        setButtonLoading(btnVerify, true, 'Verificando...', 'Verificar firma', 'ti-shield-search');
-        hideElement(verifyResult);
+        setButtonLoading(btnVerificar, true, 'Verificando...', 'Verificar firma', 'ti-shield-search');
+        hideElement(resultadoVerificacion);
 
         try {
-            const result = await apiVerifyDocument(selectedFile);
-            renderVerifyResult(verifyResult, result);
+            const resultado = await verificarDocumento(archivoVerificacionSeleccionado);
+            renderVerifyResult(resultadoVerificacion, resultado);
         } catch (error) {
-            verifyResult.className = 'verify-result invalid';
-            verifyResult.classList.remove('hidden');
-            verifyResult.innerHTML = `
+            resultadoVerificacion.className = 'verify-result invalid';
+            resultadoVerificacion.classList.remove('hidden');
+            resultadoVerificacion.innerHTML = `
                 <div class="result-header">
                     <i class="ti ti-circle-x" aria-hidden="true"></i>
                     Error al verificar: ${error.message}
                 </div>
             `;
         } finally {
-            setButtonLoading(btnVerify, false, '', 'Verificar firma', 'ti-shield-search');
+            setButtonLoading(btnVerificar, false, '', 'Verificar firma', 'ti-shield-search');
         }
     });
 });

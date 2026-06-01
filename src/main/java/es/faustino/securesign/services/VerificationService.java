@@ -1,4 +1,4 @@
-package es.faustino.securesign.services.verification;
+package es.faustino.securesign.services;
 
 import es.faustino.securesign.dto.internal.DatosCertificado;
 import es.faustino.securesign.dto.internal.ResultadoExtraccion;

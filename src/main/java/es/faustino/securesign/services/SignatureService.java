@@ -1,5 +1,6 @@
-package es.faustino.securesign.services.signature;
+package es.faustino.securesign.services;
 
+import es.faustino.securesign.crypto.CryptoIdentityService;
 import es.faustino.securesign.crypto.KeyStoreAccessService;
 import es.faustino.securesign.shared.enums.SignatureAlgorithm;
 import eu.europa.esig.dss.enumerations.SignatureLevel;
@@ -24,12 +25,21 @@ public class SignatureService {
 
     private static final Logger log = LoggerFactory.getLogger(SignatureService.class);
     private final KeyStoreAccessService keyStoreService;
+    private final CryptoIdentityService cryptoIdentityService;
 
-    public SignatureService(KeyStoreAccessService keyStoreService) {
+    public SignatureService(KeyStoreAccessService keyStoreService,
+                            CryptoIdentityService cryptoIdentityService) {
         this.keyStoreService = keyStoreService;
+        this.cryptoIdentityService = cryptoIdentityService;
     }
 
-    public byte[] firmarPdf(byte[] bytesPdf, X509Certificate certificado, String algoritmo) throws Exception {
+    public byte[] firmarDocumento(byte[] bytesPdf, String jcaName) throws Exception {
+        SignatureAlgorithm algoritmo = SignatureAlgorithm.fromJcaName(jcaName);
+        X509Certificate certificado = cryptoIdentityService.obtenerCertificado(algoritmo);
+        return firmarPdf(bytesPdf, certificado, jcaName);
+    }
+
+    private byte[] firmarPdf(byte[] bytesPdf, X509Certificate certificado, String algoritmo) throws Exception {
 
         String alias = keyStoreService.buscarAliasPorCertificado(certificado);
 
