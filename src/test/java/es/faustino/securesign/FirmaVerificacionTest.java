@@ -64,7 +64,9 @@ class FirmaVerificacionTest {
         return new DocumentService(keyManagementService, signatureService);
     }
 
-    /** Genera un PDF mínimo en memoria para usar como entrada en los tests. */
+    /**
+     * Genera un PDF mínimo en memoria para usar como entrada en los tests.
+     */
     private byte[] crearPdfSimple(String texto) throws Exception {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         try (PDDocument doc = new PDDocument()) {
@@ -102,10 +104,10 @@ class FirmaVerificacionTest {
         assertTrue(r.firmaExtraible(), "Estado 0: el bloque /Contents debe ser extraíble");
         assertTrue(r.cmsParseable(), "Estado 0: el CMS debe ser parseable");
         assertTrue(r.certificadoExtraible(), "Estado 0: el certificado debe ser extraíble");
-        assertTrue(r.byteRangeValido(), "Estado 0: el ByteRange debe ser coherente");
+        assertTrue(r.estructuraValida(), "Estado 0: el ByteRange debe ser coherente");
         assertTrue(r.firmaValida(), "Estado 0: la firma debe ser criptográficamente válida");
         assertTrue(r.certificadoVigente(), "Estado 0: el certificado debe estar vigente");
-        assertTrue(r.valid(), "Estado 0: el resultado global debe ser válido");
+        assertTrue(r.valido(), "Estado 0: el resultado global debe ser válido");
         assertNull(r.razon(), "Estado 0: no debe haber razón de fallo");
         assertNotNull(r.subject(), "El subject no debe ser null");
         assertTrue(r.subject().contains("SecureSign"), "El subject debe contener 'SecureSign'");
@@ -129,9 +131,9 @@ class FirmaVerificacionTest {
         assertTrue(r.firmaExtraible(), "Estado 1: la firma debe seguir siendo extraíble");
         assertTrue(r.cmsParseable(), "Estado 1: el CMS debe seguir siendo parseable");
         assertTrue(r.certificadoExtraible(), "Estado 1: el certificado X.509 debe seguir existiendo");
-        assertTrue(r.byteRangeValido(), "Estado 1: el ByteRange debe seguir siendo coherente");
+        assertTrue(r.estructuraValida(), "Estado 1: el ByteRange debe seguir siendo coherente");
         assertFalse(r.firmaValida(), "Estado 1: la firma DEBE ser inválida tras la modificación");
-        assertFalse(r.valid(), "Estado 1: el resultado global debe ser inválido");
+        assertFalse(r.valido(), "Estado 1: el resultado global debe ser inválido");
         assertNotNull(r.razon(), "Estado 1: debe indicar el motivo del fallo");
     }
 
@@ -148,7 +150,7 @@ class FirmaVerificacionTest {
         VerificationResultResponse r = new VerificationService().verificarDocumentoFirmado(pdfSinFirma);
         imprimirResultado("⚠️ PDF SIN FIRMA", r);
 
-        assertFalse(r.valid(), "Un PDF sin firma no debe ser válido");
+        assertFalse(r.valido(), "Un PDF sin firma no debe ser válido");
         assertFalse(r.firmaExtraible(), "No hay firma que extraer");
         assertFalse(r.firmaValida(), "No hay firma válida");
         assertNotNull(r.razon(), "Debe indicar que no hay firma");
@@ -169,9 +171,9 @@ class FirmaVerificacionTest {
         imprimirResultado("✅ PDF VÁLIDO (Ed25519)", r);
 
         assertTrue(r.firmaValida(), "Ed25519: la firma debe ser criptográficamente válida");
-        assertTrue(r.byteRangeValido(), "Ed25519: ByteRange coherente");
+        assertTrue(r.estructuraValida(), "Ed25519: ByteRange coherente");
         assertTrue(r.cmsParseable(), "Ed25519: CMS parseable");
-        assertTrue(r.valid(), "Ed25519: resultado global válido");
+        assertTrue(r.valido(), "Ed25519: resultado global válido");
     }
 
     // ═════════════════════════════════════════════════════════════════════════
@@ -188,11 +190,11 @@ class FirmaVerificacionTest {
 
     private void imprimirResultado(String titulo, VerificationResultResponse r) {
         System.out.println("\n=== " + titulo + " ===");
-        System.out.println("  valid               : " + r.valid());
+        System.out.println("  valido               : " + r.valido());
         System.out.println("  firmaExtraible      : " + r.firmaExtraible());
         System.out.println("  cmsParseable        : " + r.cmsParseable());
         System.out.println("  certificadoExtraible: " + r.certificadoExtraible());
-        System.out.println("  byteRangeValido     : " + r.byteRangeValido());
+        System.out.println("  estructuraValida     : " + r.estructuraValida());
         System.out.println("  firmaValida         : " + r.firmaValida());
         System.out.println("  certificadoVigente  : " + r.certificadoVigente());
         System.out.println("  subject             : " + r.subject());

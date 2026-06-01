@@ -19,29 +19,32 @@ public class ByteRangeExtractor {
 
     public static ResultadoExtraccion extraer(byte[] bytesPdf) throws Exception {
         long[] byteRange = leerByteRangeDelPdf(bytesPdf);
-        long offsetTramo1 = byteRange[0];
-        long longitudTramo1 = byteRange[1];
-        long offsetTramo2 = byteRange[2];
-        long longitudTramo2 = byteRange[3];
+        long offsetSegmento1 = byteRange[0];
+        long longitudSegmento1 = byteRange[1];
+        long offsetSegmento2 = byteRange[2];
+        long longitudSegmento2 = byteRange[3];
 
         log.info("[EXTRACCION] ByteRange: [{}, {}, {}, {}] | PDF: {} bytes",
-                offsetTramo1, longitudTramo1, offsetTramo2, longitudTramo2, bytesPdf.length);
+                offsetSegmento1, longitudSegmento1, offsetSegmento2, longitudSegmento2, bytesPdf.length);
 
-        boolean byteRangeValido = validarByteRange(offsetTramo1, longitudTramo1, offsetTramo2, longitudTramo2, bytesPdf.length);
+        boolean byteRangeValido = validarByteRange(offsetSegmento1, longitudSegmento1, offsetSegmento2, longitudSegmento2, bytesPdf.length);
 
-        verificarQueLosTramosNoCaenFueraDelPdf(bytesPdf, offsetTramo1, longitudTramo1, offsetTramo2, longitudTramo2);
-        verificarQueLosValoresCabenEnUnEntero(longitudTramo1, longitudTramo2, offsetTramo2);
+        verificarLimitesDeSegmentos(bytesPdf, offsetSegmento1, longitudSegmento1, offsetSegmento2, longitudSegmento2);
+        verificarTamanosDentroDeRango(longitudSegmento1, longitudSegmento2, offsetSegmento2);
 
-        byte[] pdfRecortadoAlTamanoOriginal = recortarPdfAlTamanoOriginal(bytesPdf, offsetTramo2, longitudTramo2);
+        byte[] pdfRecortadoAlTamanoOriginal = recortarPdfAlTamanoOriginal(bytesPdf, offsetSegmento2, longitudSegmento2);
 
-        byte[] contenidoFirmado = ensamblarContenidoFirmado(pdfRecortadoAlTamanoOriginal, offsetTramo1, longitudTramo1, offsetTramo2, longitudTramo2);
-        log.info("[EXTRACCION] Contenido firmado ensamblado: {} bytes (tramo1={} + tramo2={})",
-                contenidoFirmado.length, longitudTramo1, longitudTramo2);
+        byte[] bytesPdfCubiertos = ensamblarContenidoFirmado(pdfRecortadoAlTamanoOriginal, offsetSegmento1, longitudSegmento1, offsetSegmento2, longitudSegmento2);
+        log.info("[EXTRACCION] Bytes PDF cubiertos ensamblados: {} bytes (segmento1={} + segmento2={})",
+                bytesPdfCubiertos.length, longitudSegmento1, longitudSegmento2);
 
-        byte[] cmsDerBytes = extraerBloqueCmsDer(pdfRecortadoAlTamanoOriginal);
-        log.info("[EXTRACCION] Bloque CMS DER extraido: {} bytes", cmsDerBytes.length);
+        // Se usa el PDF original (no el recortado) para extraer el bloque CMS,
+        // ya que PDFBox puede no reconocer la firma si el PDF tiene bytes extra al final
+        // y el recorte elimina parte de la estructura que PDFBox necesita para indexar /Sig.
+        byte[] bytesCMS = extraerBloqueCmsDer(bytesPdf);
+        log.info("[EXTRACCION] Bloque CMS DER extraido: {} bytes", bytesCMS.length);
 
-        return new ResultadoExtraccion(offsetTramo1, longitudTramo1, offsetTramo2, longitudTramo2, contenidoFirmado, cmsDerBytes, byteRangeValido);
+        return new ResultadoExtraccion(offsetSegmento1, longitudSegmento1, offsetSegmento2, longitudSegmento2, bytesPdfCubiertos, bytesCMS, byteRangeValido);
     }
 
     private static long[] leerByteRangeDelPdf(byte[] bytesPdf) throws Exception {
@@ -60,21 +63,21 @@ public class ByteRangeExtractor {
         }
     }
 
-    private static byte[] recortarPdfAlTamanoOriginal(byte[] bytesPdf, long offsetTramo2, long longitudTramo2) {
-        int tamanoOriginal = (int) (offsetTramo2 + longitudTramo2);
+    private static byte[] recortarPdfAlTamanoOriginal(byte[] bytesPdf, long offsetSegmento2, long longitudSegmento2) {
+        int tamanoOriginal = (int) (offsetSegmento2 + longitudSegmento2);
         return (bytesPdf.length == tamanoOriginal)
                 ? bytesPdf
                 : Arrays.copyOf(bytesPdf, tamanoOriginal);
     }
 
     private static byte[] ensamblarContenidoFirmado(byte[] bytesPdf,
-                                                    long offsetTramo1, long longitudTramo1,
-                                                    long offsetTramo2, long longitudTramo2) {
-        byte[] contenidoFirmado = new byte[(int) (longitudTramo1 + longitudTramo2)];
-        ByteBuffer ensamblador = ByteBuffer.wrap(contenidoFirmado);
-        ensamblador.put(bytesPdf, (int) offsetTramo1, (int) longitudTramo1);
-        ensamblador.put(bytesPdf, (int) offsetTramo2, (int) longitudTramo2);
-        return contenidoFirmado;
+                                                    long offsetSegmento1, long longitudSegmento1,
+                                                    long offsetSegmento2, long longitudSegmento2) {
+        byte[] bytesPdfCubiertos = new byte[(int) (longitudSegmento1 + longitudSegmento2)];
+        ByteBuffer ensamblador = ByteBuffer.wrap(bytesPdfCubiertos);
+        ensamblador.put(bytesPdf, (int) offsetSegmento1, (int) longitudSegmento1);
+        ensamblador.put(bytesPdf, (int) offsetSegmento2, (int) longitudSegmento2);
+        return bytesPdfCubiertos;
     }
 
     private static byte[] extraerBloqueCmsDer(byte[] bytesPdf) throws Exception {
@@ -88,26 +91,26 @@ public class ByteRangeExtractor {
         }
     }
 
-    private static boolean validarByteRange(long offsetTramo1, long longitudTramo1,
-                                            long offsetTramo2, long longitudTramo2,
+    private static boolean validarByteRange(long offsetSegmento1, long longitudSegmento1,
+                                            long offsetSegmento2, long longitudSegmento2,
                                             long longitudTotalPdf) {
-        if (offsetTramo1 != 0) {
-            log.warn("[VALIDACION] offsetTramo1={} debe ser 0 en PAdES", offsetTramo1);
+        if (offsetSegmento1 != 0) {
+            log.warn("[VALIDACION] offsetSegmento1={} debe ser 0 en PAdES", offsetSegmento1);
             return false;
         }
-        if (longitudTramo1 <= 0) {
-            log.warn("[VALIDACION] longitudTramo1={} es 0 o negativo", longitudTramo1);
+        if (longitudSegmento1 <= 0) {
+            log.warn("[VALIDACION] longitudSegmento1={} es 0 o negativo", longitudSegmento1);
             return false;
         }
-        if (offsetTramo2 <= longitudTramo1) {
-            log.warn("[VALIDACION] offsetTramo2={} <= longitudTramo1={} — los tramos se solapan", offsetTramo2, longitudTramo1);
+        if (offsetSegmento2 <= longitudSegmento1) {
+            log.warn("[VALIDACION] offsetSegmento2={} <= longitudSegmento1={} — los segmentos se solapan", offsetSegmento2, longitudSegmento1);
             return false;
         }
-        if (longitudTramo2 <= 0) {
-            log.warn("[VALIDACION] longitudTramo2={} es 0 o negativo", longitudTramo2);
+        if (longitudSegmento2 <= 0) {
+            log.warn("[VALIDACION] longitudSegmento2={} es 0 o negativo", longitudSegmento2);
             return false;
         }
-        long finDelPdf = offsetTramo2 + longitudTramo2;
+        long finDelPdf = offsetSegmento2 + longitudSegmento2;
         if (finDelPdf != longitudTotalPdf) {
             log.warn("[VALIDACION] fin calculado={} != longitudTotalPdf={} — desalineacion de {} bytes",
                     finDelPdf, longitudTotalPdf, finDelPdf - longitudTotalPdf);
@@ -116,11 +119,11 @@ public class ByteRangeExtractor {
         return true;
     }
 
-    private static void verificarQueLosTramosNoCaenFueraDelPdf(byte[] bytesPdf,
-                                                               long offsetTramo1, long longitudTramo1,
-                                                               long offsetTramo2, long longitudTramo2) {
-        verificarTramo(offsetTramo1, longitudTramo1, bytesPdf.length, "tramo1");
-        verificarTramo(offsetTramo2, longitudTramo2, bytesPdf.length, "tramo2");
+    private static void verificarLimitesDeSegmentos(byte[] bytesPdf,
+                                                    long offsetSegmento1, long longitudSegmento1,
+                                                    long offsetSegmento2, long longitudSegmento2) {
+        verificarTramo(offsetSegmento1, longitudSegmento1, bytesPdf.length, "segmento1");
+        verificarTramo(offsetSegmento2, longitudSegmento2, bytesPdf.length, "segmento2");
     }
 
     private static void verificarTramo(long offset, long longitud, long longitudPdf, String nombreTramo) {
@@ -132,14 +135,14 @@ public class ByteRangeExtractor {
         }
     }
 
-    private static void verificarQueLosValoresCabenEnUnEntero(long longitudTramo1, long longitudTramo2, long offsetTramo2) {
-        verificarQueElValorCabeEnUnEntero(longitudTramo1, "longitudTramo1");
-        verificarQueElValorCabeEnUnEntero(longitudTramo2, "longitudTramo2");
-        verificarQueElValorCabeEnUnEntero(longitudTramo1 + longitudTramo2, "longitudTramo1 + longitudTramo2");
-        verificarQueElValorCabeEnUnEntero(offsetTramo2 + longitudTramo2, "offsetTramo2 + longitudTramo2");
+    private static void verificarTamanosDentroDeRango(long longitudSegmento1, long longitudSegmento2, long offsetSegmento2) {
+        verificarTamanoDentroDeRango(longitudSegmento1, "longitudSegmento1");
+        verificarTamanoDentroDeRango(longitudSegmento2, "longitudSegmento2");
+        verificarTamanoDentroDeRango(longitudSegmento1 + longitudSegmento2, "longitudSegmento1 + longitudSegmento2");
+        verificarTamanoDentroDeRango(offsetSegmento2 + longitudSegmento2, "offsetSegmento2 + longitudSegmento2");
     }
 
-    private static void verificarQueElValorCabeEnUnEntero(long valor, String nombreValor) {
+    private static void verificarTamanoDentroDeRango(long valor, String nombreValor) {
         if (valor < 0 || valor > Integer.MAX_VALUE) {
             throw new IllegalStateException(
                     "ByteRange " + nombreValor + "=" + valor + " excede Integer.MAX_VALUE"

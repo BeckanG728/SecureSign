@@ -1,5 +1,6 @@
 package es.faustino.securesign.services.certificate;
 
+import es.faustino.securesign.shared.enums.SignatureAlgorithm;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x509.BasicConstraints;
 import org.bouncycastle.asn1.x509.Extension;
@@ -21,48 +22,35 @@ import java.util.Date;
 @Service
 public class CertificateX509Service {
 
-    public X509Certificate generarCertificadoX509(KeyPair keyPair, String algorithm) throws Exception {
+    private static final X500Name SUBJECT =
+            new X500Name("CN=SecureSign Institucional, O=Universidad, C=PE");
 
-        X500Name subject = new X500Name("CN=SecureSign Institucional, O=Universidad, C=PE");
+    public X509Certificate generarCertificadoX509(KeyPair keyPair, String algoritmo) throws Exception {
+
         BigInteger serialNumber = new BigInteger(128, new SecureRandom());
         Instant now = Instant.now();
 
         JcaX509v3CertificateBuilder builder = new JcaX509v3CertificateBuilder(
-                subject,
+                SUBJECT,
                 serialNumber,
                 Date.from(now.minus(1, ChronoUnit.MINUTES)),
                 Date.from(now.plus(365, ChronoUnit.DAYS)),
-                subject,
+                SUBJECT,
                 keyPair.getPublic()
         );
 
         JcaX509ExtensionUtils extUtils = new JcaX509ExtensionUtils();
 
-        builder.addExtension(
-                Extension.subjectKeyIdentifier,
-                false,
-                extUtils.createSubjectKeyIdentifier(keyPair.getPublic())
-        );
+        builder.addExtension(Extension.subjectKeyIdentifier, false,
+                extUtils.createSubjectKeyIdentifier(keyPair.getPublic()));
+        builder.addExtension(Extension.authorityKeyIdentifier, false,
+                extUtils.createAuthorityKeyIdentifier(keyPair.getPublic()));
+        builder.addExtension(Extension.keyUsage, true,
+                new KeyUsage(KeyUsage.digitalSignature | KeyUsage.nonRepudiation));
+        builder.addExtension(Extension.basicConstraints, true,
+                new BasicConstraints(false));
 
-        builder.addExtension(
-                Extension.authorityKeyIdentifier,
-                false,
-                extUtils.createAuthorityKeyIdentifier(keyPair.getPublic())
-        );
-
-        builder.addExtension(
-                Extension.keyUsage,
-                true,
-                new KeyUsage(KeyUsage.digitalSignature | KeyUsage.nonRepudiation)
-        );
-
-        builder.addExtension(
-                Extension.basicConstraints,
-                true,
-                new BasicConstraints(false)
-        );
-
-        String sigAlg = "Ed25519".equals(algorithm) ? "Ed25519" : "SHA256withECDSA";
+        String sigAlg = SignatureAlgorithm.resolverNombreJca(algoritmo);
 
         return new JcaX509CertificateConverter().getCertificate(
                 builder.build(new JcaContentSignerBuilder(sigAlg).build(keyPair.getPrivate()))

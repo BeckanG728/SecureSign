@@ -37,7 +37,7 @@ function downloadBlob(blob, filename) {
  * @param {Object} result
  */
 function renderVerifyResult(container, result) {
-    const isValid = result.valid === true;
+    const isValid = result.valido === true;
     container.className = 'verify-result ' + (isValid ? 'valid' : 'invalid');
     container.classList.remove('hidden');
 

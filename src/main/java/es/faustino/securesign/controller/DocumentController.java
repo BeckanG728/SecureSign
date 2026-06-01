@@ -28,18 +28,20 @@ public class DocumentController {
             @RequestParam(value = "algorithm", defaultValue = "EC") String algorithm) throws Exception {
 
         byte[] pdfFirmado = documentService.firmarDocumento(file.getBytes(), algorithm);
-
-        String nombreOriginal = file.getOriginalFilename();
-        String nombreBase = (nombreOriginal != null && nombreOriginal.endsWith(".pdf"))
-                ? nombreOriginal.replace(".pdf", "")
-                : "documento";
-        String nombreArchivo = nombreBase + "_firmado.pdf";
+        String nombreArchivo = construirNombreArchivo(file.getOriginalFilename());
 
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_PDF_VALUE)
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + nombreArchivo + "\"")
                 .header(HttpHeaders.CONTENT_LENGTH, String.valueOf(pdfFirmado.length))
                 .body(pdfFirmado);
+    }
+
+    private String construirNombreArchivo(String nombreOriginal) {
+        String nombreBase = (nombreOriginal != null && nombreOriginal.endsWith(".pdf"))
+                ? nombreOriginal.replace(".pdf", "")
+                : "documento";
+        return nombreBase + "_firmado.pdf";
     }
 
     @PostMapping("/verify")
