@@ -4,324 +4,148 @@
     <meta charset="UTF-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>SecureSign</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com"/>
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&family=Syne:wght@400;700;800&display=swap"
-          rel="stylesheet"/>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css"/>
+    <link rel="stylesheet" href="css/styles.css"/>
 </head>
 <body>
 
-<header>
-    <div class="logo">
-        <div class="logo-icon">🔐</div>
-        <div>
-            <div class="logo-text">Secure<span>Sign</span></div>
+<div class="app-shell">
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="sidebar-brand">
+            <i class="ti ti-shield-lock" aria-hidden="true"></i>
+            <span>SecureSign</span>
         </div>
-    </div>
-    <div class="header-tags">
-        <span class="tag">ECDSA · Ed25519</span>
-        <span class="tag">SHA-256</span>
-        <span class="tag">PDF</span>
-    </div>
-</header>
-
-<main>
-
-    <!-- Panel 01 — Emisión -->
-    <div class="panel" id="panel-emit">
-        <div>
-            <div class="panel-num">MÓDULO 01</div>
-            <div class="panel-title emit">Emitir certificado</div>
+        <nav class="sidebar-nav">
+            <button class="nav-item active" data-tab="generate">
+                <i class="ti ti-file-certificate" aria-hidden="true"></i>
+                <span>Firmar documento</span>
+            </button>
+            <button class="nav-item" data-tab="verify">
+                <i class="ti ti-shield-check" aria-hidden="true"></i>
+                <span>Verificar firma</span>
+            </button>
+        </nav>
+        <div class="sidebar-footer">
+            <a href="securesign-explicacion.html" class="nav-item nav-item--docs">
+                <i class="ti ti-book-2" aria-hidden="true"></i>
+                <span>Cómo funciona</span>
+            </a>
+            <span>PAdES · PKCS#12</span>
         </div>
-        <p class="panel-desc">
-            Genera un documento PDF institucional firmado digitalmente con ECDSA o Ed25519.
-            El PDF puede descargarse y verificarse posteriormente.
-        </p>
+    </aside>
 
-        <div class="divider"></div>
+    <!-- Contenido principal -->
+    <main class="main-content">
 
-        <div class="row">
-            <div class="field">
-                <label for="inp-nombre">Nombre completo</label>
-                <input id="inp-nombre" type="text" placeholder="Ana García López"/>
+        <!-- Tab: Firmar -->
+        <section id="tab-generate" class="tab-panel active">
+            <div class="panel-header">
+                <div class="panel-header-icon">
+                    <i class="ti ti-file-certificate" aria-hidden="true"></i>
+                </div>
+                <div>
+                    <h1>Firmar documento PDF</h1>
+                    <p class="panel-subtitle">Sube un PDF existente y obtén la versión con firma PAdES embebida</p>
+                </div>
             </div>
-            <div class="field">
-                <label for="inp-dni">DNI</label>
-                <input id="inp-dni" type="text" placeholder="12345678"/>
+
+            <div class="card">
+                <div class="drop-zone" id="drop-zone-sign">
+                    <input type="file" id="file-input-sign" accept=".pdf"/>
+                    <i class="ti ti-cloud-upload drop-icon" aria-hidden="true"></i>
+                    <p class="drop-text">Arrastra aquí tu PDF sin firmar</p>
+                    <p class="drop-hint">o haz clic para seleccionar el archivo</p>
+                    <div id="file-selected-sign" class="file-selected hidden">
+                        <i class="ti ti-file-type-pdf" aria-hidden="true"></i>
+                        <span id="file-name-sign"></span>
+                        <button id="btn-clear-sign" class="btn-icon" aria-label="Quitar archivo">
+                            <i class="ti ti-x" aria-hidden="true"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="card-divider"></div>
+
+                <div class="card-section-title">
+                    <i class="ti ti-key" aria-hidden="true"></i>
+                    Algoritmo de firma
+                </div>
+                <div class="form-group">
+                    <div class="algo-grid" id="algo-grid">
+                        <label class="algo-card">
+                            <input type="radio" name="algorithm" value="EC" checked/>
+                            <div class="algo-card-inner">
+                                <div class="algo-name">EC · secp256r1</div>
+                                <div class="algo-sig">SHA256withECDSA</div>
+                                <div class="algo-badge">Recomendado</div>
+                            </div>
+                        </label>
+                        <label class="algo-card">
+                            <input type="radio" name="algorithm" value="Ed25519"/>
+                            <div class="algo-card-inner">
+                                <div class="algo-name">Ed25519</div>
+                                <div class="algo-sig">EdDSA · Curva 25519</div>
+                                <div class="algo-badge algo-badge-alt">Alta seguridad</div>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button id="btn-generate" class="btn btn-primary" disabled>
+                        <i class="ti ti-pen" aria-hidden="true"></i>
+                        Firmar y descargar PDF
+                    </button>
+                    <div id="generate-status" class="status-msg hidden"></div>
+                </div>
             </div>
-        </div>
+        </section>
 
-        <div class="row">
-            <div class="field">
-                <label for="inp-tipo">Tipo de certificado</label>
-                <select id="inp-tipo">
-                    <option value="">— seleccionar —</option>
-                    <option>Constancia Académica</option>
-                    <option>Antecedentes Penales</option>
-                    <option>Certificado Laboral</option>
-                    <option>Certificado de Residencia</option>
-                </select>
+        <!-- Tab: Verificar -->
+        <section id="tab-verify" class="tab-panel">
+            <div class="panel-header">
+                <div class="panel-header-icon panel-header-icon--verify">
+                    <i class="ti ti-shield-check" aria-hidden="true"></i>
+                </div>
+                <div>
+                    <h1>Verificar documento firmado</h1>
+                    <p class="panel-subtitle">Comprueba la autenticidad de un PDF con firma PAdES embebida</p>
+                </div>
             </div>
-            <div class="field">
-                <label for="inp-fecha">Fecha de emisión</label>
-                <input id="inp-fecha" type="date"/>
+
+            <div class="card">
+                <div class="drop-zone" id="drop-zone">
+                    <input type="file" id="file-input" accept=".pdf"/>
+                    <i class="ti ti-cloud-upload drop-icon" aria-hidden="true"></i>
+                    <p class="drop-text">Arrastra aquí tu PDF firmado</p>
+                    <p class="drop-hint">o haz clic para seleccionar el archivo</p>
+                    <div id="file-selected" class="file-selected hidden">
+                        <i class="ti ti-file-type-pdf" aria-hidden="true"></i>
+                        <span id="file-name"></span>
+                        <button id="btn-clear-file" class="btn-icon" aria-label="Quitar archivo">
+                            <i class="ti ti-x" aria-hidden="true"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button id="btn-verify" class="btn btn-primary" disabled>
+                        <i class="ti ti-shield-search" aria-hidden="true"></i>
+                        Verificar firma
+                    </button>
+                </div>
+
+                <div id="verify-result" class="verify-result hidden"></div>
             </div>
-        </div>
+        </section>
 
-        <div class="field">
-            <label>Algoritmo de firma</label>
-            <div class="algo-group">
-                <button class="algo-btn active" id="btn-emit-ecdsa" onclick="selectAlgoEmit('ECDSA')">ECDSA (P-256)
-                </button>
-                <button class="algo-btn" id="btn-emit-ed25519" onclick="selectAlgoEmit('Ed25519')">Ed25519</button>
-            </div>
-        </div>
+    </main>
+</div>
 
-        <button class="btn-primary btn-emit" id="btn-emitir" onclick="emitirCertificado()">
-            EMITIR CERTIFICADO →
-        </button>
-
-        <div class="result-area" id="emit-result"></div>
-
-        <div class="download-block" id="download-block">
-            <div class="dl-meta">
-                Certificado firmado · Key ID: <span id="meta-keyid">—</span><br>
-                Algoritmo: <span id="meta-algo">—</span>
-            </div>
-            <button class="btn-download" onclick="descargarPDF()">⬇ Descargar PDF firmado</button>
-        </div>
-    </div>
-
-    <!-- Panel 02 — Verificación -->
-    <div class="panel" id="panel-verify">
-        <div>
-            <div class="panel-num">MÓDULO 02</div>
-            <div class="panel-title verify">Verificar certificado</div>
-        </div>
-        <p class="panel-desc">
-            Sube el PDF firmado para comprobar su integridad y autenticidad criptográfica.
-            Cualquier alteración invalida la firma de forma determinista.
-        </p>
-
-        <div class="divider"></div>
-
-        <div class="field">
-            <label for="ver-keyid">Key ID</label>
-            <input id="ver-keyid" type="text" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"/>
-        </div>
-
-        <div class="field">
-            <label>Algoritmo</label>
-            <div class="algo-group">
-                <button class="algo-btn active" id="btn-ver-ecdsa" onclick="selectAlgoVer('ECDSA')">ECDSA (P-256)
-                </button>
-                <button class="algo-btn" id="btn-ver-ed25519" onclick="selectAlgoVer('Ed25519')">Ed25519</button>
-            </div>
-        </div>
-
-        <div class="field">
-            <label>Archivo PDF</label>
-            <div class="dropzone" id="dropzone">
-                <input type="file" id="ver-file" accept="application/pdf" onchange="onFileChange(this)"/>
-                <span class="dz-icon">📄</span>
-                <div class="dz-label">Arrastra el PDF aquí o haz clic para seleccionar</div>
-                <div class="dz-filename" id="dz-filename"></div>
-            </div>
-        </div>
-
-        <button class="btn-primary btn-verify" id="btn-verificar" onclick="verificarCertificado()">
-            VERIFICAR FIRMA →
-        </button>
-
-        <div class="result-area" id="verify-result"></div>
-    </div>
-
-</main>
-
-<footer>
-    <span class="footer-tag"><span class="dot green"></span>ECDSA · secp256r1</span>
-    <span class="footer-tag"><span class="dot blue"></span>Ed25519 · determinista</span>
-    <span class="footer-tag"><span class="dot yellow"></span>SHA-256 · integridad</span>
-    <span class="footer-tag" style="opacity:.3">|</span>
-    <span class="footer-tag">localhost:8080</span>
-</footer>
-
-<script>
-    const API = 'http://localhost:8080';
-
-    let selectedAlgoEmit = 'ECDSA';
-    let selectedAlgoVer  = 'ECDSA';
-    let lastEmission     = null;
-
-    function selectAlgoEmit(algorithm) {
-      selectedAlgoEmit = algorithm;
-      document.getElementById('btn-emit-ecdsa').classList.toggle('active',   algorithm === 'ECDSA');
-      document.getElementById('btn-emit-ed25519').classList.toggle('active', algorithm === 'Ed25519');
-    }
-
-    function selectAlgoVer(algo) {
-      selectedAlgoVer = algo;
-      document.getElementById('btn-ver-ecdsa').classList.toggle('active',   algo === 'ECDSA');
-      document.getElementById('btn-ver-ed25519').classList.toggle('active', algo === 'Ed25519');
-    }
-
-    function showResult(id, type, msg) {
-      const el = document.getElementById(id);
-      el.className = 'result-area show ' + type;
-      el.textContent = msg;
-    }
-
-    function hideResult(id) {
-      document.getElementById(id).className = 'result-area';
-    }
-
-    // ── Dropzone ──────────────────────────────────────────────────────────────
-    const dz = document.getElementById('dropzone');
-
-    dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('dragover'); });
-    dz.addEventListener('dragleave', () => dz.classList.remove('dragover'));
-    dz.addEventListener('drop', e => {
-      e.preventDefault();
-      dz.classList.remove('dragover');
-      const file = e.dataTransfer.files[0];
-      if (file && file.type === 'application/pdf') {
-        document.getElementById('ver-file').files = e.dataTransfer.files;
-        document.getElementById('dz-filename').textContent = file.name;
-      }
-    });
-
-    function onFileChange(input) {
-      const file = input.files[0];
-      document.getElementById('dz-filename').textContent = file ? file.name : '';
-    }
-
-    // ── Emitir ────────────────────────────────────────────────────────────────
-    async function emitirCertificado() {
-      const nombre = document.getElementById('inp-nombre').value.trim();
-      const dni    = document.getElementById('inp-dni').value.trim();
-      const tipo   = document.getElementById('inp-tipo').value;
-      const fecha  = document.getElementById('inp-fecha').value;
-
-      if (!nombre || !dni || !tipo || !fecha) {
-        showResult('emit-result', 'error', '✗ Completa todos los campos antes de emitir.');
-        return;
-      }
-
-      hideResult('emit-result');
-      document.getElementById('download-block').classList.remove('show');
-
-      const btn = document.getElementById('btn-emitir');
-      btn.disabled = true;
-      btn.classList.add('loading');
-      btn.textContent = 'GENERANDO...';
-
-      try {
-        const res = await fetch(`${API}/api/certificates/generate`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ nombre, dni, tipo, fecha, algorithm: selectedAlgoEmit }),
-        });
-
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err.error || `HTTP ${res.status}`);
-        }
-
-        const keyId   = res.headers.get('X-Key-Id');
-        const algo    = res.headers.get('X-Algorithm') || selectedAlgoEmit;
-        const pdfBlob = await res.blob();
-
-        lastEmission = { keyId, algorithm: algo, pdfBlob, nombre };
-
-        document.getElementById('meta-keyid').textContent = keyId;
-        document.getElementById('meta-algo').textContent  = algo;
-        document.getElementById('download-block').classList.add('show');
-
-        // Autocompletar verificación
-        document.getElementById('ver-keyid').value = keyId;
-        selectAlgoVer(algo);
-
-        showResult('emit-result', 'success', `✓ Certificado generado y firmado con ${algo}.`);
-
-      } catch (e) {
-        showResult('emit-result', 'error', '✗ Error al conectar con el backend: ' + e.message);
-      } finally {
-        btn.disabled = false;
-        btn.classList.remove('loading');
-        btn.textContent = 'EMITIR CERTIFICADO →';
-      }
-    }
-
-    // ── Descargar ─────────────────────────────────────────────────────────────
-    function descargarPDF() {
-      if (!lastEmission) return;
-      const url = URL.createObjectURL(lastEmission.pdfBlob);
-      const a   = document.createElement('a');
-      a.href     = url;
-      a.download = `certificado_${lastEmission.nombre.replace(/\s+/g, '_').toLowerCase()}.pdf`;
-      a.click();
-      URL.revokeObjectURL(url);
-    }
-
-    // ── Verificar ─────────────────────────────────────────────────────────────
-    async function verificarCertificado() {
-      const keyId = document.getElementById('ver-keyid').value.trim();
-      const file  = document.getElementById('ver-file').files[0];
-
-      if (!keyId) {
-        showResult('verify-result', 'error', '✗ Ingresa el Key ID del certificado.');
-        return;
-      }
-      if (!file) {
-        showResult('verify-result', 'error', '✗ Selecciona el archivo PDF a verificar.');
-        return;
-      }
-
-      hideResult('verify-result');
-
-      const btn = document.getElementById('btn-verificar');
-      btn.disabled = true;
-      btn.classList.add('loading');
-      btn.textContent = 'VERIFICANDO...';
-
-      try {
-        const formData = new FormData();
-        formData.append('keyId',     keyId);
-        formData.append('algorithm', selectedAlgoVer);
-        formData.append('file',      file);
-
-        const res = await fetch(`${API}/api/certificates/verify`, {
-          method: 'POST',
-          body: formData,
-        });
-
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err.error || `HTTP ${res.status}`);
-        }
-
-        const data = await res.json();
-
-        if (data.valid) {
-          showResult('verify-result', 'success',
-            '✓ Firma válida — El documento es auténtico e íntegro.');
-        } else {
-          showResult('verify-result', 'error',
-            '✗ Firma inválida — El documento fue alterado o los datos no coinciden.');
-        }
-
-      } catch (e) {
-        showResult('verify-result', 'error', '✗ Error al conectar con el backend: ' + e.message);
-      } finally {
-        btn.disabled = false;
-        btn.classList.remove('loading');
-        btn.textContent = 'VERIFICAR FIRMA →';
-      }
-    }
-
-    // Fecha de hoy por defecto
-    document.getElementById('inp-fecha').value = new Date().toISOString().split('T')[0];
-</script>
+<script src="js/api.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/app.js"></script>
 </body>
 </html>
