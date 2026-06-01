@@ -42,20 +42,19 @@ public class SignatureService {
     private byte[] firmarPdf(byte[] bytesPdf, X509Certificate certificado, String algoritmo) throws Exception {
 
         String alias = keyStoreService.buscarAliasPorCertificado(certificado);
-
         log.info("[FIRMA] Iniciando firma PAdES — alias={}, algoritmo={}, tamañoPdf={} bytes", alias, algoritmo, bytesPdf.length);
 
         try (KeyStoreSignatureTokenConnection conexionToken = keyStoreService.abrirConexionToken()) {
-            KSPrivateKeyEntry entradaClave = (KSPrivateKeyEntry) conexionToken.getKey(alias);
+            KSPrivateKeyEntry identidadFirmante = (KSPrivateKeyEntry) conexionToken.getKey(alias);
 
-            PAdESSignatureParameters parametrosFirma = construirParametrosFirma(entradaClave, algoritmo);
+            PAdESSignatureParameters parametrosFirma = construirParametrosFirma(identidadFirmante, algoritmo);
             PAdESService servicioPades = construirServicioPades();
             DSSDocument documentoPdf = new InMemoryDocument(bytesPdf);
 
             ToBeSigned datosAFirmar = servicioPades.getDataToSign(documentoPdf, parametrosFirma);
             log.debug("[FIRMA] Datos a firmar obtenidos — {} bytes", datosAFirmar.getBytes().length);
 
-            SignatureValue valorFirma = conexionToken.sign(datosAFirmar, parametrosFirma.getDigestAlgorithm(), entradaClave);
+            SignatureValue valorFirma = conexionToken.sign(datosAFirmar, parametrosFirma.getDigestAlgorithm(), identidadFirmante);
             log.debug("[FIRMA] Valor de firma calculado");
 
             DSSDocument documentoFirmado = servicioPades.signDocument(documentoPdf, parametrosFirma, valorFirma);
@@ -67,12 +66,12 @@ public class SignatureService {
         }
     }
 
-    private PAdESSignatureParameters construirParametrosFirma(KSPrivateKeyEntry entradaClave, String algoritmo) {
+    private PAdESSignatureParameters construirParametrosFirma(KSPrivateKeyEntry identidadFirmante, String algoritmo) {
         PAdESSignatureParameters parametros = new PAdESSignatureParameters();
         parametros.setSignatureLevel(SignatureLevel.PAdES_BASELINE_B);
         parametros.setSignaturePackaging(SignaturePackaging.ENVELOPED);
-        parametros.setSigningCertificate(entradaClave.getCertificate());
-        parametros.setCertificateChain(entradaClave.getCertificateChain());
+        parametros.setSigningCertificate(identidadFirmante.getCertificate());
+        parametros.setCertificateChain(identidadFirmante.getCertificateChain());
         parametros.setDigestAlgorithm(SignatureAlgorithm.resolverDigestDss(algoritmo));
         return parametros;
     }

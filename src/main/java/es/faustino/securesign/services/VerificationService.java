@@ -39,7 +39,7 @@ public class VerificationService {
         if (cms == null)
             return cmsCorrupto(extraccion.estructuraValida(), "El bloque CMS (/Contents) está estructuralmente corrupto");
 
-        DatosCertificado datosCert = extraerCertificado(cms, extraccion);
+        DatosCertificado datosCert = extraerCertificado(cms);
         if (datosCert == null)
             return sinCertificado(extraccion.estructuraValida(), "El CMS no contiene ningún certificado X.509");
 
@@ -70,7 +70,7 @@ public class VerificationService {
         }
     }
 
-    private DatosCertificado extraerCertificado(CMSSignedData cms, ResultadoExtraccion extraccion) {
+    private DatosCertificado extraerCertificado(CMSSignedData cms) {
         try {
             X509CertificateHolder certHolder = CertificadoUtils.extraerCertHolder(cms);
             if (certHolder == null) return null;
