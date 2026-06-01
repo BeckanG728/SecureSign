@@ -10,4 +10,4 @@ logging:
     es.faustino.securesign: DEBUG
 
 securesign:
-  keystore-password: ${SECURESIGN_KEYSTORE_PASSWORD:securesign-dev-password}
+  keystore-password: ${SECURESIGN_KEYSTORE_PASSWORD:gmId2e7xiGu9JPIMXep3M0PTe4VvZrPW4z0ej4KKu24=}

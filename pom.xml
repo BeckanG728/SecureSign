@@ -15,6 +15,7 @@
     <groupId>es.faustino</groupId>
     <artifactId>SecureSign</artifactId>
     <version>0.0.1-SNAPSHOT</version>
+    <packaging>war</packaging>
     <name>SecureSign</name>
     <description>Firma PAdES robusta con DSS 6.4 + PDFBox 3.x</description>
 
@@ -50,7 +51,11 @@
     </dependencyManagement>
 
     <dependencies>
-
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-tomcat</artifactId>
+            <scope>provided</scope>
+        </dependency>
         <!-- ═══════════════════════════════════════════════════════════════
              SPRING BOOT
         ════════════════════════════════════════════════════════════════ -->
