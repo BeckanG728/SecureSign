@@ -10,4 +10,6 @@ logging:
     es.faustino.securesign: DEBUG
 
 securesign:
-  keystore-password: ${SECURESIGN_KEYSTORE_PASSWORD:gmId2e7xiGu9JPIMXep3M0PTe4VvZrPW4z0ej4KKu24=}
+  keystore-password: ${SECURESIGN_KEYSTORE_PASSWORD:password-dev-default}
+  alias-ecdsa: securesign-ecdsa
+  alias-ed25519: securesign-ed25519

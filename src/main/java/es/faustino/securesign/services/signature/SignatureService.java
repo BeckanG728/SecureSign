@@ -1,6 +1,6 @@
 package es.faustino.securesign.services.signature;
 
-import es.faustino.securesign.keys.KeyStoreService;
+import es.faustino.securesign.crypto.KeyStoreAccessService;
 import es.faustino.securesign.shared.enums.SignatureAlgorithm;
 import eu.europa.esig.dss.enumerations.SignatureLevel;
 import eu.europa.esig.dss.enumerations.SignaturePackaging;
@@ -23,9 +23,9 @@ import java.security.cert.X509Certificate;
 public class SignatureService {
 
     private static final Logger log = LoggerFactory.getLogger(SignatureService.class);
-    private final KeyStoreService keyStoreService;
+    private final KeyStoreAccessService keyStoreService;
 
-    public SignatureService(KeyStoreService keyStoreService) {
+    public SignatureService(KeyStoreAccessService keyStoreService) {
         this.keyStoreService = keyStoreService;
     }
 

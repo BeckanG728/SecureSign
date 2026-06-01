@@ -6,7 +6,10 @@ import es.faustino.securesign.services.verification.VerificationService;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 @RestController
@@ -23,11 +26,11 @@ public class DocumentController {
     }
 
     @PostMapping("/sign")
-    public ResponseEntity<byte[]> generate(
+    public ResponseEntity<byte[]> sign(
             @RequestParam("file") MultipartFile file,
-            @RequestParam(value = "algorithm", defaultValue = "EC") String algorithm) throws Exception {
+            @RequestParam(value = "algorithm") String algoritmo) throws Exception {
 
-        byte[] pdfFirmado = documentService.firmarDocumento(file.getBytes(), algorithm);
+        byte[] pdfFirmado = documentService.firmarDocumento(file.getBytes(), algoritmo);
         String nombreArchivo = construirNombreArchivo(file.getOriginalFilename());
 
         return ResponseEntity.ok()

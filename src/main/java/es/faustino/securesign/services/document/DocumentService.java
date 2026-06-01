@@ -1,7 +1,8 @@
 package es.faustino.securesign.services.document;
 
-import es.faustino.securesign.keys.KeyManagementService;
+import es.faustino.securesign.crypto.CryptoIdentityService;
 import es.faustino.securesign.services.signature.SignatureService;
+import es.faustino.securesign.shared.enums.SignatureAlgorithm;
 import org.springframework.stereotype.Service;
 
 import java.security.cert.X509Certificate;
@@ -9,18 +10,18 @@ import java.security.cert.X509Certificate;
 @Service
 public class DocumentService {
 
-    private final KeyManagementService keyManagementService;
+    private final CryptoIdentityService cryptoIdentityService;
     private final SignatureService signatureService;
 
-    public DocumentService(KeyManagementService keyManagementService,
+    public DocumentService(CryptoIdentityService cryptoIdentityService,
                            SignatureService signatureService) {
-        this.keyManagementService = keyManagementService;
+        this.cryptoIdentityService = cryptoIdentityService;
         this.signatureService = signatureService;
     }
 
-    public byte[] firmarDocumento(byte[] bytesPdf, String algoritmo) throws Exception {
-        String alias = keyManagementService.generarYAlmacenarParDeClaves(algoritmo);
-        X509Certificate certificado = keyManagementService.buscarCertificadoPorAlias(alias);
-        return signatureService.firmarPdf(bytesPdf, certificado, algoritmo);
+    public byte[] firmarDocumento(byte[] bytesPdf, String jcaName) throws Exception {
+        SignatureAlgorithm algoritmo = SignatureAlgorithm.fromJcaName(jcaName);
+        X509Certificate certificado = cryptoIdentityService.obtenerCertificado(algoritmo);
+        return signatureService.firmarPdf(bytesPdf, certificado, jcaName);
     }
 }

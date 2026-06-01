@@ -1,4 +1,4 @@
-package es.faustino.securesign.keys;
+package es.faustino.securesign.crypto;
 
 import eu.europa.esig.dss.token.KeyStoreSignatureTokenConnection;
 import org.springframework.beans.factory.annotation.Value;
@@ -13,7 +13,7 @@ import java.security.cert.X509Certificate;
 import java.util.Enumeration;
 
 @Service
-public class KeyStoreService {
+public class KeyStoreAccessService {
 
     private static final String PKCS12 = "PKCS12";
 
@@ -23,11 +23,16 @@ public class KeyStoreService {
     @Value("${securesign.keystore-password}")
     private String claveAcceso;
 
-    /** Constructor para Spring (inyección por @Value). */
-    public KeyStoreService() {}
+    /**
+     * Constructor para Spring (inyección por @Value).
+     */
+    public KeyStoreAccessService() {
+    }
 
-    /** Constructor para tests sin contexto Spring. */
-    public KeyStoreService(String rutaArchivo, String tipo, String claveAcceso) {
+    /**
+     * Constructor para tests sin contexto Spring.
+     */
+    public KeyStoreAccessService(String rutaArchivo, String tipo, String claveAcceso) {
         this.rutaArchivo = rutaArchivo;
         this.claveAcceso = claveAcceso;
     }

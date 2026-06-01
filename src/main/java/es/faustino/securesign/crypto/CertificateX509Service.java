@@ -1,4 +1,4 @@
-package es.faustino.securesign.services.certificate;
+package es.faustino.securesign.crypto;
 
 import es.faustino.securesign.shared.enums.SignatureAlgorithm;
 import org.bouncycastle.asn1.x500.X500Name;
@@ -23,7 +23,7 @@ import java.util.Date;
 public class CertificateX509Service {
 
     private static final X500Name SUBJECT =
-            new X500Name("CN=SecureSign Institucional, O=Universidad, C=PE");
+            new X500Name("CN=Equipo-01 SecureSign, OU=Criptografia II, O=SecureSign, C=PE");
 
     public X509Certificate generarCertificadoX509(KeyPair keyPair, String algoritmo) throws Exception {
 
@@ -50,7 +50,7 @@ public class CertificateX509Service {
         builder.addExtension(Extension.basicConstraints, true,
                 new BasicConstraints(false));
 
-        String sigAlg = SignatureAlgorithm.resolverNombreJca(algoritmo);
+        String sigAlg = SignatureAlgorithm.fromJcaName(algoritmo).getJcaName();
 
         return new JcaX509CertificateConverter().getCertificate(
                 builder.build(new JcaContentSignerBuilder(sigAlg).build(keyPair.getPrivate()))
