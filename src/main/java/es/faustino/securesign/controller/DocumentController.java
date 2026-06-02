@@ -52,8 +52,7 @@ public class DocumentController {
             @RequestParam MultipartFile file) throws Exception {
 
         byte[] pdfFirmadoBytes = file.getBytes();
-        VerificationResultResponse resultado =
-                verificationService.verificarDocumentoFirmado(pdfFirmadoBytes);
+        VerificationResultResponse resultado = verificationService.verificarDocumentoFirmado(pdfFirmadoBytes);
 
         return ResponseEntity.ok(resultado);
     }

@@ -12,12 +12,13 @@ public enum SignatureAlgorithm {
     SHA256_WITH_ECDSA(
             "1.2.840.10045.4.3.2",
             "SHA256withECDSA",
+            "EC",
             DigestAlgorithm.SHA256
     ) {
         @Override
         public KeyPair generarParDeClaves() throws Exception {
             KeyPairGenerator gen = KeyPairGenerator.getInstance("EC");
-            gen.initialize(new ECGenParameterSpec("secp256r1")); // P-256
+            gen.initialize(new ECGenParameterSpec("secp256r1"));
             return gen.generateKeyPair();
         }
     },
@@ -25,6 +26,7 @@ public enum SignatureAlgorithm {
     ED25519(
             "1.3.101.112",
             "Ed25519",
+            "EdDSA",
             DigestAlgorithm.SHA512
     ) {
         @Override
@@ -33,16 +35,18 @@ public enum SignatureAlgorithm {
         }
     },
 
-    SHA256_WITH_RSA("1.2.840.113549.1.1.11", "SHA256withRSA", DigestAlgorithm.SHA256),
-    SHA512_WITH_RSA("1.2.840.113549.1.1.13", "SHA512withRSA", DigestAlgorithm.SHA512);
+    SHA256_WITH_RSA("1.2.840.113549.1.1.11", "SHA256withRSA", "RSA", DigestAlgorithm.SHA256),
+    SHA512_WITH_RSA("1.2.840.113549.1.1.13", "SHA512withRSA", "RSA", DigestAlgorithm.SHA512);
 
     private final String oid;
     private final String jcaName;
+    private final String jcaKeyAlias;
     private final DigestAlgorithm digestAlgorithmDss;
 
-    SignatureAlgorithm(String oid, String jcaName, DigestAlgorithm digestAlgorithmDss) {
+    SignatureAlgorithm(String oid, String jcaName, String jcaKeyAlias, DigestAlgorithm digestAlgorithmDss) {
         this.oid = oid;
         this.jcaName = jcaName;
+        this.jcaKeyAlias = jcaKeyAlias;
         this.digestAlgorithmDss = digestAlgorithmDss;
     }
 
@@ -76,7 +80,7 @@ public enum SignatureAlgorithm {
 
     public static SignatureAlgorithm fromJcaName(String jcaName) {
         return Arrays.stream(values())
-                .filter(a -> a.jcaName.equals(jcaName))
+                .filter(a -> a.jcaName.equals(jcaName) || a.jcaKeyAlias.equals(jcaName))
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException(
                         "Algoritmo no soportado: '" + jcaName + "'"));

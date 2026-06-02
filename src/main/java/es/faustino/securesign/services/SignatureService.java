@@ -2,6 +2,7 @@ package es.faustino.securesign.services;
 
 import es.faustino.securesign.crypto.CryptoIdentityService;
 import es.faustino.securesign.crypto.KeyStoreAccessService;
+import es.faustino.securesign.dto.internal.CryptoIdentity;
 import es.faustino.securesign.shared.enums.SignatureAlgorithm;
 import eu.europa.esig.dss.enumerations.SignatureLevel;
 import eu.europa.esig.dss.enumerations.SignaturePackaging;
@@ -18,8 +19,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-import java.security.cert.X509Certificate;
-
 @Service
 public class SignatureService {
 
@@ -35,26 +34,25 @@ public class SignatureService {
 
     public byte[] firmarDocumento(byte[] bytesPdf, String jcaName) throws Exception {
         SignatureAlgorithm algoritmo = SignatureAlgorithm.fromJcaName(jcaName);
-        X509Certificate certificado = cryptoIdentityService.obtenerCertificado(algoritmo);
-        return firmarPdf(bytesPdf, certificado, jcaName);
+        CryptoIdentity identidad = cryptoIdentityService.obtenerIdentidad(algoritmo);
+        return firmarPdf(bytesPdf, identidad, algoritmo);
     }
 
-    private byte[] firmarPdf(byte[] bytesPdf, X509Certificate certificado, String algoritmo) throws Exception {
-
-        String alias = keyStoreService.buscarAliasPorCertificado(certificado);
-        log.info("[FIRMA] Iniciando firma PAdES — alias={}, algoritmo={}, tamañoPdf={} bytes", alias, algoritmo, bytesPdf.length);
+    private byte[] firmarPdf(byte[] bytesPdf, CryptoIdentity identidad, SignatureAlgorithm algoritmo) throws Exception {
+        log.info("[FIRMA] Iniciando firma PAdES — alias={}, algoritmo={}, tamañoPdf={} bytes",
+                identidad.alias(), algoritmo, bytesPdf.length);
 
         try (KeyStoreSignatureTokenConnection conexionToken = keyStoreService.abrirConexionToken()) {
-            KSPrivateKeyEntry identidadFirmante = (KSPrivateKeyEntry) conexionToken.getKey(alias);
+            KSPrivateKeyEntry crendencialesFirma = (KSPrivateKeyEntry) conexionToken.getKey(identidad.alias());
 
-            PAdESSignatureParameters parametrosFirma = construirParametrosFirma(identidadFirmante, algoritmo);
+            PAdESSignatureParameters parametrosFirma = construirParametrosFirma(crendencialesFirma, algoritmo);
             PAdESService servicioPades = construirServicioPades();
             DSSDocument documentoPdf = new InMemoryDocument(bytesPdf);
 
             ToBeSigned datosAFirmar = servicioPades.getDataToSign(documentoPdf, parametrosFirma);
             log.debug("[FIRMA] Datos a firmar obtenidos — {} bytes", datosAFirmar.getBytes().length);
 
-            SignatureValue valorFirma = conexionToken.sign(datosAFirmar, parametrosFirma.getDigestAlgorithm(), identidadFirmante);
+            SignatureValue valorFirma = conexionToken.sign(datosAFirmar, parametrosFirma.getDigestAlgorithm(), crendencialesFirma);
             log.debug("[FIRMA] Valor de firma calculado");
 
             DSSDocument documentoFirmado = servicioPades.signDocument(documentoPdf, parametrosFirma, valorFirma);
@@ -66,13 +64,13 @@ public class SignatureService {
         }
     }
 
-    private PAdESSignatureParameters construirParametrosFirma(KSPrivateKeyEntry identidadFirmante, String algoritmo) {
+    private PAdESSignatureParameters construirParametrosFirma(KSPrivateKeyEntry crendencialFirma, SignatureAlgorithm algoritmo) {
         PAdESSignatureParameters parametros = new PAdESSignatureParameters();
         parametros.setSignatureLevel(SignatureLevel.PAdES_BASELINE_B);
         parametros.setSignaturePackaging(SignaturePackaging.ENVELOPED);
-        parametros.setSigningCertificate(identidadFirmante.getCertificate());
-        parametros.setCertificateChain(identidadFirmante.getCertificateChain());
-        parametros.setDigestAlgorithm(SignatureAlgorithm.resolverDigestDss(algoritmo));
+        parametros.setSigningCertificate(crendencialFirma.getCertificate());
+        parametros.setCertificateChain(crendencialFirma.getCertificateChain());
+        parametros.setDigestAlgorithm(algoritmo.getDigestAlgorithmDss());
         return parametros;
     }
 

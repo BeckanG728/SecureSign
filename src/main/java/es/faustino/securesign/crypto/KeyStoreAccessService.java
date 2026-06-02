@@ -23,16 +23,10 @@ public class KeyStoreAccessService {
     @Value("${securesign.keystore-password}")
     private String claveAcceso;
 
-    /**
-     * Constructor para Spring (inyección por @Value).
-     */
     public KeyStoreAccessService() {
     }
 
-    /**
-     * Constructor para tests sin contexto Spring.
-     */
-    public KeyStoreAccessService(String rutaArchivo, String tipo, String claveAcceso) {
+    public KeyStoreAccessService(String rutaArchivo, String claveAcceso) {
         this.rutaArchivo = rutaArchivo;
         this.claveAcceso = claveAcceso;
     }

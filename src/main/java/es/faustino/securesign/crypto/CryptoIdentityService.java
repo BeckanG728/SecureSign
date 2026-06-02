@@ -1,6 +1,6 @@
 package es.faustino.securesign.crypto;
 
-import es.faustino.securesign.crypto.CertificateX509Service;
+import es.faustino.securesign.dto.internal.CryptoIdentity;
 import es.faustino.securesign.shared.enums.SignatureAlgorithm;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,14 +39,14 @@ public class CryptoIdentityService {
         keyStoreAccessService.guardar(keyStore);
     }
 
-    public X509Certificate obtenerCertificado(SignatureAlgorithm algoritmo) throws Exception {
+    public CryptoIdentity obtenerIdentidad(SignatureAlgorithm algoritmo) throws Exception {
         String alias = resolverAlias(algoritmo);
         KeyStore keyStore = keyStoreAccessService.cargar();
         X509Certificate cert = (X509Certificate) keyStore.getCertificate(alias);
         if (cert == null) {
             throw new IllegalStateException("Identidad no inicializada — alias: " + alias);
         }
-        return cert;
+        return new CryptoIdentity(alias, cert);
     }
 
     public String resolverAlias(SignatureAlgorithm algoritmo) {
