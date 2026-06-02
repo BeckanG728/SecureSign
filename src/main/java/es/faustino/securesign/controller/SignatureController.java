@@ -8,6 +8,7 @@ import es.faustino.securesign.service.SignatureService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.Map;
 
@@ -23,7 +24,7 @@ public class SignatureController {
     }
 
     /**
-     * POST /api/keys/generate?algorithm=Ed25519
+     * POST /api/keys/generate?algorithm=Ed25519|ECDSA|RSA
      * Genera un par de claves y devuelve el keyId.
      */
     @PostMapping("/keys/generate")
@@ -46,30 +47,33 @@ public class SignatureController {
 
     /**
      * POST /api/sign
-     * Body: { "keyId": "...", "algorithm": "Ed25519", "data": "<base64>" }
-     * Firma el dato y devuelve la firma en Base64.
+     * Body: { "keyId": "...", "algorithm": "Ed25519|ECDSA|RSA", "data": "texto plano" }
+     * Hashea el texto con SHA-256 en el backend, firma el hash y devuelve ambos.
      */
     @PostMapping("/sign")
     public ResponseEntity<SignResponse> sign(@RequestBody SignRequest request) throws Exception {
-        byte[] data = Base64.getDecoder().decode(request.data());
-        byte[] firma = signatureService.sign(request.keyId(), request.algorithm(), data);
+        byte[] plainText = request.data().getBytes(StandardCharsets.UTF_8);
+        Object[] result = signatureService.sign(request.keyId(), request.algorithm(), plainText);
+        String hashHex = (String) result[0];
+        byte[] firma = (byte[]) result[1];
         return ResponseEntity.ok(new SignResponse(
                 request.keyId(),
                 request.algorithm(),
+                hashHex,
                 Base64.getEncoder().encodeToString(firma)
         ));
     }
 
     /**
      * POST /api/verify
-     * Body: { "keyId": "...", "algorithm": "Ed25519", "data": "<base64>", "signature": "<base64>" }
-     * Verifica si la firma corresponde al dato y clave indicados.
+     * Body: { "keyId": "...", "algorithm": "Ed25519|ECDSA|RSA", "data": "texto plano", "signature": "<base64>" }
+     * Recalcula el hash SHA-256 del texto y verifica la firma contra él.
      */
     @PostMapping("/verify")
     public ResponseEntity<Map<String, Object>> verify(@RequestBody VerifyRequest request) throws Exception {
-        byte[] data = Base64.getDecoder().decode(request.data());
+        byte[] plainText = request.data().getBytes(StandardCharsets.UTF_8);
         byte[] firma = Base64.getDecoder().decode(request.signature());
-        boolean valida = signatureService.verify(request.keyId(), request.algorithm(), data, firma);
+        boolean valida = signatureService.verify(request.keyId(), request.algorithm(), plainText, firma);
         return ResponseEntity.ok(Map.of("valid", valida));
     }
 }

@@ -21,127 +21,100 @@
     </div>
     <div class="header-tags">
         <span class="tag">ECDSA · Ed25519</span>
-        <span class="tag">SHA-256</span>
-        <span class="tag">PDF</span>
+        <span class="tag tag-rsa">RSA · SHA-256</span>
+        <span class="tag">PKCS#1 v1.5</span>
     </div>
 </header>
 
 <main>
 
-    <!-- Panel 01 — Emisión -->
-    <div class="panel" id="panel-emit">
+    <!-- ══════════════════════════════════════════════════════════
+         MÓDULO 01 — Firma y verificación (ECDSA / Ed25519)
+    ══════════════════════════════════════════════════════════ -->
+    <div class="panel panel-sign" id="panel-sign">
         <div>
             <div class="panel-num">MÓDULO 01</div>
-            <div class="panel-title emit">Emitir certificado</div>
+            <div class="panel-title sign">Firmar y verificar datos</div>
         </div>
         <p class="panel-desc">
-            Genera un documento PDF institucional firmado digitalmente con ECDSA o Ed25519.
-            El PDF puede descargarse y verificarse posteriormente.
+            Genera un par de claves, firma cualquier texto y verifica la firma al instante.
+            Soporta ECDSA (secp256r1), Ed25519 y RSA-2048 con SHA-256.
         </p>
 
         <div class="divider"></div>
 
-        <div class="row">
-            <div class="field">
-                <label for="inp-nombre">Nombre completo</label>
-                <input id="inp-nombre" type="text" placeholder="Ana García López"/>
+        <!-- Paso 1: generar clave -->
+        <div class="sign-step">
+            <div class="step-label">PASO 1 — Generar clave</div>
+            <div class="sign-row">
+                <div class="field" style="flex:1">
+                    <label>Algoritmo</label>
+                    <div class="algo-group">
+                        <button class="algo-btn sign-algo active" id="btn-sign-ecdsa" onclick="selectAlgoSign('ECDSA')">ECDSA (P-256)</button>
+                        <button class="algo-btn sign-algo" id="btn-sign-ed25519" onclick="selectAlgoSign('Ed25519')">Ed25519</button>
+                        <button class="algo-btn sign-algo" id="btn-sign-rsa" onclick="selectAlgoSign('RSA')">RSA-2048</button>
+                    </div>
+                </div>
+                <div style="display:flex;align-items:flex-end">
+                    <button class="btn-primary btn-sign" id="btn-generar-clave" onclick="generarClave()"
+                            style="width:auto;padding:.55rem 1.2rem;white-space:nowrap">
+                        GENERAR CLAVE →
+                    </button>
+                </div>
             </div>
-            <div class="field">
-                <label for="inp-dni">DNI</label>
-                <input id="inp-dni" type="text" placeholder="12345678"/>
-            </div>
-        </div>
-
-        <div class="row">
-            <div class="field">
-                <label for="inp-tipo">Tipo de certificado</label>
-                <select id="inp-tipo">
-                    <option value="">— seleccionar —</option>
-                    <option>Constancia Académica</option>
-                    <option>Antecedentes Penales</option>
-                    <option>Certificado Laboral</option>
-                    <option>Certificado de Residencia</option>
-                </select>
-            </div>
-            <div class="field">
-                <label for="inp-fecha">Fecha de emisión</label>
-                <input id="inp-fecha" type="date"/>
-            </div>
-        </div>
-
-        <div class="field">
-            <label>Algoritmo de firma</label>
-            <div class="algo-group">
-                <button class="algo-btn active" id="btn-emit-ecdsa" onclick="selectAlgoEmit('ECDSA')">ECDSA (P-256)
-                </button>
-                <button class="algo-btn" id="btn-emit-ed25519" onclick="selectAlgoEmit('Ed25519')">Ed25519</button>
+            <div class="result-area" id="gen-key-result"></div>
+            <div class="sign-key-block" id="sign-key-block">
+                <div class="key-meta">Key ID: <span id="sign-meta-keyid">—</span> &nbsp;·&nbsp; Algoritmo: <span
+                        id="sign-meta-algo">—</span></div>
+                <div class="key-pub-wrap">
+                    <div class="key-pub-label">CLAVE PÚBLICA (Base64)</div>
+                    <div class="key-pub-value" id="sign-pubkey">—</div>
+                </div>
             </div>
         </div>
-
-        <button class="btn-primary btn-emit" id="btn-emitir" onclick="emitirCertificado()">
-            EMITIR CERTIFICADO →
-        </button>
-
-        <div class="result-area" id="emit-result"></div>
-
-        <div class="download-block" id="download-block">
-            <div class="dl-meta">
-                Certificado firmado · Key ID: <span id="meta-keyid">—</span><br>
-                Algoritmo: <span id="meta-algo">—</span>
-            </div>
-            <button class="btn-download" onclick="descargarPDF()">⬇ Descargar PDF firmado</button>
-        </div>
-    </div>
-
-    <!-- Panel 02 — Verificación -->
-    <div class="panel" id="panel-verify">
-        <div>
-            <div class="panel-num">MÓDULO 02</div>
-            <div class="panel-title verify">Verificar certificado</div>
-        </div>
-        <p class="panel-desc">
-            Sube el PDF firmado para comprobar su integridad y autenticidad criptográfica.
-            Cualquier alteración invalida la firma de forma determinista.
-        </p>
 
         <div class="divider"></div>
 
-        <div class="field">
-            <label for="ver-keyid">Key ID</label>
-            <input id="ver-keyid" type="text" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"/>
-        </div>
-
-        <div class="field">
-            <label>Algoritmo</label>
-            <div class="algo-group">
-                <button class="algo-btn active" id="btn-ver-ecdsa" onclick="selectAlgoVer('ECDSA')">ECDSA (P-256)
-                </button>
-                <button class="algo-btn" id="btn-ver-ed25519" onclick="selectAlgoVer('Ed25519')">Ed25519</button>
+        <!-- Paso 2: firmar -->
+        <div class="sign-step">
+            <div class="step-label">PASO 2 — Firmar mensaje</div>
+            <div class="field">
+                <label>Mensaje</label>
+                <textarea id="sign-msg" rows="3" placeholder="Escribe el texto a firmar…"></textarea>
+            </div>
+            <button class="btn-primary btn-sign" id="btn-firmar" onclick="firmarMensaje()">FIRMAR →</button>
+            <div class="result-area" id="sign-result"></div>
+            <div class="sign-sig-block" id="sign-sig-block">
+                <div class="key-pub-label">SHA-256 DEL MENSAJE (hex)</div>
+                <div class="key-pub-value" id="sign-datahash">—</div>
+                <div class="key-pub-label" style="margin-top:.75rem">FIRMA (Base64)</div>
+                <div class="key-pub-value" id="sign-signature">—</div>
             </div>
         </div>
 
-        <div class="field">
-            <label>Archivo PDF</label>
-            <div class="dropzone" id="dropzone">
-                <input type="file" id="ver-file" accept="application/pdf" onchange="onFileChange(this)"/>
-                <span class="dz-icon">📄</span>
-                <div class="dz-label">Arrastra el PDF aquí o haz clic para seleccionar</div>
-                <div class="dz-filename" id="dz-filename"></div>
+        <div class="divider"></div>
+
+        <!-- Paso 3: verificar -->
+        <div class="sign-step">
+            <div class="step-label">PASO 3 — Verificar firma</div>
+            <div class="field">
+                <label>Mensaje a verificar</label>
+                <textarea id="ver-msg" rows="3"
+                          placeholder="El mismo texto firmado (o modifícalo para simular tampering)…"></textarea>
             </div>
+            <button class="btn-primary btn-sign" id="btn-verificar-sign" onclick="verificarFirma()">VERIFICAR →</button>
+            <div class="result-area" id="ver-sign-result"></div>
         </div>
-
-        <button class="btn-primary btn-verify" id="btn-verificar" onclick="verificarCertificado()">
-            VERIFICAR FIRMA →
-        </button>
-
-        <div class="result-area" id="verify-result"></div>
     </div>
+
+
 
 </main>
 
 <footer>
     <span class="footer-tag"><span class="dot green"></span>ECDSA · secp256r1</span>
     <span class="footer-tag"><span class="dot blue"></span>Ed25519 · determinista</span>
+    <span class="footer-tag"><span class="dot purple"></span>RSA-2048 · PKCS#1</span>
     <span class="footer-tag"><span class="dot yellow"></span>SHA-256 · integridad</span>
     <span class="footer-tag" style="opacity:.3">|</span>
     <span class="footer-tag">localhost:8080</span>
@@ -150,178 +123,234 @@
 <script>
     const API = 'http://localhost:8080';
 
-    let selectedAlgoEmit = 'ECDSA';
-    let selectedAlgoVer  = 'ECDSA';
-    let lastEmission     = null;
-
-    function selectAlgoEmit(algorithm) {
-      selectedAlgoEmit = algorithm;
-      document.getElementById('btn-emit-ecdsa').classList.toggle('active',   algorithm === 'ECDSA');
-      document.getElementById('btn-emit-ed25519').classList.toggle('active', algorithm === 'Ed25519');
-    }
-
-    function selectAlgoVer(algo) {
-      selectedAlgoVer = algo;
-      document.getElementById('btn-ver-ecdsa').classList.toggle('active',   algo === 'ECDSA');
-      document.getElementById('btn-ver-ed25519').classList.toggle('active', algo === 'Ed25519');
-    }
-
     function showResult(id, type, msg) {
-      const el = document.getElementById(id);
-      el.className = 'result-area show ' + type;
-      el.textContent = msg;
+        const el = document.getElementById(id);
+        el.className = 'result-area show ' + type;
+        el.textContent = msg;
     }
 
     function hideResult(id) {
-      document.getElementById(id).className = 'result-area';
+        document.getElementById(id).className = 'result-area';
     }
 
-    // ── Dropzone ──────────────────────────────────────────────────────────────
-    const dz = document.getElementById('dropzone');
-
-    dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('dragover'); });
-    dz.addEventListener('dragleave', () => dz.classList.remove('dragover'));
-    dz.addEventListener('drop', e => {
-      e.preventDefault();
-      dz.classList.remove('dragover');
-      const file = e.dataTransfer.files[0];
-      if (file && file.type === 'application/pdf') {
-        document.getElementById('ver-file').files = e.dataTransfer.files;
-        document.getElementById('dz-filename').textContent = file.name;
-      }
-    });
-
-    function onFileChange(input) {
-      const file = input.files[0];
-      document.getElementById('dz-filename').textContent = file ? file.name : '';
+    function toB64(str) {
+        return btoa(unescape(encodeURIComponent(str)));
     }
 
-    // ── Emitir ────────────────────────────────────────────────────────────────
-    async function emitirCertificado() {
-      const nombre = document.getElementById('inp-nombre').value.trim();
-      const dni    = document.getElementById('inp-dni').value.trim();
-      const tipo   = document.getElementById('inp-tipo').value;
-      const fecha  = document.getElementById('inp-fecha').value;
+    function setBtn(id, disabled, text) {
+        const b = document.getElementById(id);
+        b.disabled = disabled;
+        b.classList.toggle('loading', disabled);
+        b.textContent = text;
+    }
 
-      if (!nombre || !dni || !tipo || !fecha) {
-        showResult('emit-result', 'error', '✗ Completa todos los campos antes de emitir.');
-        return;
-      }
+    // ══════════════════════════════════════════════════════════
+    // MÓDULO 01 — ECDSA / Ed25519
+    // ══════════════════════════════════════════════════════════
 
-      hideResult('emit-result');
-      document.getElementById('download-block').classList.remove('show');
+    let selectedAlgoSign = 'ECDSA';
+    let signKeyId        = null;
+    let signAlgorithm    = null;
+    let lastSignature    = null;
 
-      const btn = document.getElementById('btn-emitir');
-      btn.disabled = true;
-      btn.classList.add('loading');
-      btn.textContent = 'GENERANDO...';
+    function selectAlgoSign(algo) {
+        selectedAlgoSign = algo;
+        document.getElementById('btn-sign-ecdsa').classList.toggle('active',   algo === 'ECDSA');
+        document.getElementById('btn-sign-ed25519').classList.toggle('active', algo === 'Ed25519');
+        document.getElementById('btn-sign-rsa').classList.toggle('active',     algo === 'RSA');
+    }
 
-      try {
-        const res = await fetch(`${API}/api/certificates/generate`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ nombre, dni, tipo, fecha, algorithm: selectedAlgoEmit }),
-        });
+    async function generarClave() {
+        setBtn('btn-generar-clave', true, 'GENERANDO...');
+        hideResult('gen-key-result');
+        document.getElementById('sign-key-block').classList.remove('show');
 
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err.error || `HTTP ${res.status}`);
+        try {
+            const res = await fetch(`${API}/api/keys/generate?algorithm=${selectedAlgoSign}`, { method: 'POST' });
+            if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `HTTP ${res.status}`);
+            const data = await res.json();
+            signKeyId     = data.keyId;
+            signAlgorithm = data.algorithm;
+
+            const res2  = await fetch(`${API}/api/keys/${signKeyId}`);
+            const kinfo = await res2.json();
+
+            document.getElementById('sign-meta-keyid').textContent = signKeyId;
+            document.getElementById('sign-meta-algo').textContent  = signAlgorithm;
+            document.getElementById('sign-pubkey').textContent     = kinfo.publicKey || '—';
+            document.getElementById('sign-key-block').classList.add('show');
+            showResult('gen-key-result', 'success', `✓ Par de claves ${signAlgorithm} generado correctamente.`);
+        } catch (e) {
+            showResult('gen-key-result', 'error', '✗ ' + e.message);
         }
 
-        const keyId   = res.headers.get('X-Key-Id');
-        const algo    = res.headers.get('X-Algorithm') || selectedAlgoEmit;
-        const pdfBlob = await res.blob();
-
-        lastEmission = { keyId, algorithm: algo, pdfBlob, nombre };
-
-        document.getElementById('meta-keyid').textContent = keyId;
-        document.getElementById('meta-algo').textContent  = algo;
-        document.getElementById('download-block').classList.add('show');
-
-        // Autocompletar verificación
-        document.getElementById('ver-keyid').value = keyId;
-        selectAlgoVer(algo);
-
-        showResult('emit-result', 'success', `✓ Certificado generado y firmado con ${algo}.`);
-
-      } catch (e) {
-        showResult('emit-result', 'error', '✗ Error al conectar con el backend: ' + e.message);
-      } finally {
-        btn.disabled = false;
-        btn.classList.remove('loading');
-        btn.textContent = 'EMITIR CERTIFICADO →';
-      }
+        setBtn('btn-generar-clave', false, 'GENERAR CLAVE →');
     }
 
-    // ── Descargar ─────────────────────────────────────────────────────────────
-    function descargarPDF() {
-      if (!lastEmission) return;
-      const url = URL.createObjectURL(lastEmission.pdfBlob);
-      const a   = document.createElement('a');
-      a.href     = url;
-      a.download = `certificado_${lastEmission.nombre.replace(/\s+/g, '_').toLowerCase()}.pdf`;
-      a.click();
-      URL.revokeObjectURL(url);
-    }
+    async function firmarMensaje() {
+        if (!signKeyId) { showResult('sign-result', 'error', '✗ Genera primero un par de claves (Paso 1).'); return; }
+        const msg = document.getElementById('sign-msg').value.trim();
+        if (!msg)       { showResult('sign-result', 'error', '✗ Escribe un mensaje antes de firmar.');       return; }
 
-    // ── Verificar ─────────────────────────────────────────────────────────────
-    async function verificarCertificado() {
-      const keyId = document.getElementById('ver-keyid').value.trim();
-      const file  = document.getElementById('ver-file').files[0];
+        setBtn('btn-firmar', true, 'FIRMANDO...');
+        document.getElementById('sign-sig-block').classList.remove('show');
+        hideResult('sign-result');
 
-      if (!keyId) {
-        showResult('verify-result', 'error', '✗ Ingresa el Key ID del certificado.');
-        return;
-      }
-      if (!file) {
-        showResult('verify-result', 'error', '✗ Selecciona el archivo PDF a verificar.');
-        return;
-      }
+        try {
+            const res = await fetch(`${API}/api/sign`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ keyId: signKeyId, algorithm: signAlgorithm, data: msg })
+            });
+            if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `HTTP ${res.status}`);
+            const data = await res.json();
 
-      hideResult('verify-result');
-
-      const btn = document.getElementById('btn-verificar');
-      btn.disabled = true;
-      btn.classList.add('loading');
-      btn.textContent = 'VERIFICANDO...';
-
-      try {
-        const formData = new FormData();
-        formData.append('keyId',     keyId);
-        formData.append('algorithm', selectedAlgoVer);
-        formData.append('file',      file);
-
-        const res = await fetch(`${API}/api/certificates/verify`, {
-          method: 'POST',
-          body: formData,
-        });
-
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err.error || `HTTP ${res.status}`);
+            lastSignature = data.signature;
+            document.getElementById('sign-datahash').textContent  = data.dataHash;
+            document.getElementById('sign-signature').textContent = lastSignature;
+            document.getElementById('sign-sig-block').classList.add('show');
+            document.getElementById('ver-msg').value = msg;
+            showResult('sign-result', 'success', `✓ Mensaje firmado con ${signAlgorithm}.`);
+        } catch (e) {
+            showResult('sign-result', 'error', '✗ ' + e.message);
         }
 
-        const data = await res.json();
-
-        if (data.valid) {
-          showResult('verify-result', 'success',
-            '✓ Firma válida — El documento es auténtico e íntegro.');
-        } else {
-          showResult('verify-result', 'error',
-            '✗ Firma inválida — El documento fue alterado o los datos no coinciden.');
-        }
-
-      } catch (e) {
-        showResult('verify-result', 'error', '✗ Error al conectar con el backend: ' + e.message);
-      } finally {
-        btn.disabled = false;
-        btn.classList.remove('loading');
-        btn.textContent = 'VERIFICAR FIRMA →';
-      }
+        setBtn('btn-firmar', false, 'FIRMAR →');
     }
 
-    // Fecha de hoy por defecto
-    document.getElementById('inp-fecha').value = new Date().toISOString().split('T')[0];
+    async function verificarFirma() {
+        if (!signKeyId || !lastSignature) {
+            showResult('ver-sign-result', 'error', '✗ Completa los pasos 1 y 2 primero.'); return;
+        }
+        const msg = document.getElementById('ver-msg').value.trim();
+        if (!msg) { showResult('ver-sign-result', 'error', '✗ Escribe el mensaje a verificar.'); return; }
+
+        setBtn('btn-verificar-sign', true, 'VERIFICANDO...');
+        hideResult('ver-sign-result');
+
+        try {
+            const res = await fetch(`${API}/api/verify`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ keyId: signKeyId, algorithm: signAlgorithm, data: msg, signature: lastSignature })
+            });
+            if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `HTTP ${res.status}`);
+            const data = await res.json();
+            showResult('ver-sign-result',
+                data.valid ? 'success' : 'error',
+                data.valid
+                    ? '✓ Firma válida — el mensaje es auténtico e íntegro.'
+                    : '✗ Firma inválida — el mensaje fue alterado o la clave no corresponde.');
+        } catch (e) {
+            showResult('ver-sign-result', 'error', '✗ ' + e.message);
+        }
+
+        setBtn('btn-verificar-sign', false, 'VERIFICAR →');
+    }
+
+    // ══════════════════════════════════════════════════════════
+    // MÓDULO 02 — RSA
+    // ══════════════════════════════════════════════════════════
+
+    let rsaKeyId       = null;
+    let rsaSignatureB64 = null;
+
+    async function generarClaveRsa() {
+        setBtn('btn-gen-rsa', true, 'GENERANDO RSA-2048...');
+        hideResult('rsa-gen-result');
+        document.getElementById('rsa-key-block').classList.remove('show');
+
+        try {
+            // 1. Generar clave
+            const res = await fetch(`${API}/api/keys/generate?algorithm=RSA`, { method: 'POST' });
+            if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `HTTP ${res.status}`);
+            const data = await res.json();
+            rsaKeyId = data.keyId;
+
+            // 2. Obtener parámetros matemáticos RSA
+            const res2   = await fetch(`${API}/api/keys/${rsaKeyId}/rsa-details`);
+            if (!res2.ok) throw new Error(`HTTP ${res2.status} al obtener detalles RSA`);
+            const detail = await res2.json();
+
+            document.getElementById('rsa-meta-keyid').textContent  = rsaKeyId;
+            document.getElementById('rsa-meta-size').textContent   = detail.keySize;
+            document.getElementById('rsa-param-e').textContent     = `${detail.publicExponent} (0x${detail.publicExponent.toUpperCase()})`;
+            document.getElementById('rsa-pubkey-b64').textContent  = detail.publicKeyB64;
+            document.getElementById('rsa-param-n').textContent     = detail.modulus.toUpperCase();
+            document.getElementById('rsa-key-block').classList.add('show');
+
+            showResult('rsa-gen-result', 'success', `✓ Par RSA-${detail.keySize} generado. Módulo de ${detail.modulus.length * 4} bits.`);
+        } catch (e) {
+            showResult('rsa-gen-result', 'error', '✗ ' + e.message);
+        }
+
+        setBtn('btn-gen-rsa', false, 'GENERAR PAR RSA →');
+    }
+
+    async function firmarRsa() {
+        if (!rsaKeyId) { showResult('rsa-sign-result', 'error', '✗ Genera primero un par de claves RSA (Paso 1).'); return; }
+        const msg = document.getElementById('rsa-msg').value.trim();
+        if (!msg)      { showResult('rsa-sign-result', 'error', '✗ Escribe un mensaje antes de firmar.');            return; }
+
+        setBtn('btn-firmar-rsa', true, 'FIRMANDO...');
+        document.getElementById('rsa-sig-block').classList.remove('show');
+        hideResult('rsa-sign-result');
+
+        try {
+            const res = await fetch(`${API}/api/sign/rsa`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ keyId: rsaKeyId, data: toB64(msg) })
+            });
+            if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `HTTP ${res.status}`);
+            const data = await res.json();
+
+            rsaSignatureB64 = data.signatureB64;
+
+            document.getElementById('rsa-sig-bytes-badge').textContent = `${data.signatureBytes} bytes`;
+            document.getElementById('rsa-sig-b64').textContent = data.signatureB64;
+            document.getElementById('rsa-sig-hex').textContent = data.signatureHex.toUpperCase();
+            document.getElementById('rsa-sig-block').classList.add('show');
+            document.getElementById('rsa-ver-msg').value = msg;
+
+            showResult('rsa-sign-result', 'success',
+                `✓ Firmado con ${data.hashAlgorithm} + ${data.paddingScheme}. Firma de ${data.signatureBytes} bytes.`);
+        } catch (e) {
+            showResult('rsa-sign-result', 'error', '✗ ' + e.message);
+        }
+
+        setBtn('btn-firmar-rsa', false, 'FIRMAR CON RSA →');
+    }
+
+    async function verificarRsa() {
+        if (!rsaKeyId || !rsaSignatureB64) {
+            showResult('rsa-ver-result', 'error', '✗ Completa los pasos 1 y 2 primero.'); return;
+        }
+        const msg = document.getElementById('rsa-ver-msg').value.trim();
+        if (!msg) { showResult('rsa-ver-result', 'error', '✗ Escribe el mensaje a verificar.'); return; }
+
+        setBtn('btn-verificar-rsa', true, 'VERIFICANDO...');
+        hideResult('rsa-ver-result');
+
+        try {
+            const res = await fetch(`${API}/api/verify`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ keyId: rsaKeyId, algorithm: 'RSA', data: toB64(msg), signature: rsaSignatureB64 })
+            });
+            if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `HTTP ${res.status}`);
+            const data = await res.json();
+            showResult('rsa-ver-result',
+                data.valid ? 'success' : 'error',
+                data.valid
+                    ? '✓ Firma RSA válida — autenticidad e integridad confirmadas.'
+                    : '✗ Firma RSA inválida — el mensaje fue alterado o la clave no coincide.');
+        } catch (e) {
+            showResult('rsa-ver-result', 'error', '✗ ' + e.message);
+        }
+
+        setBtn('btn-verificar-rsa', false, 'VERIFICAR →');
+    }
 </script>
 </body>
 </html>
