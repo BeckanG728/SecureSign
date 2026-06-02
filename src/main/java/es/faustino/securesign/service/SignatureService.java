@@ -8,15 +8,10 @@ import org.springframework.stereotype.Service;
 
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
-import java.security.MessageDigest;
 import java.security.Signature;
-import java.security.spec.ECGenParameterSpec;
-import java.security.spec.RSAKeyGenParameterSpec;
-import java.math.BigInteger;
 import java.util.Base64;
 import java.util.HexFormat;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Service
@@ -24,9 +19,9 @@ public class SignatureService {
 
     private static final Logger log = LoggerFactory.getLogger(SignatureService.class);
 
-    private static final String ECDSA   = "ECDSA";
+    private static final String ECDSA = "ECDSA";
     private static final String ED25519 = "Ed25519";
-    private static final String RSA     = "RSA";
+    private static final String RSA = "RSA";
 
     private final Map<String, KeyPairEntry> keyStore = new ConcurrentHashMap<>();
 
@@ -36,22 +31,15 @@ public class SignatureService {
         String norm = normalizeAlgorithm(algorithm);
         log.info("[KEY-GEN] Algoritmo solicitado: '{}' → normalizado: '{}'", algorithm, norm);
 
-        KeyPairGenerator kpg = switch (norm) {
-            case ED25519 -> KeyPairGenerator.getInstance(ED25519);
-            case RSA -> {
-                KeyPairGenerator g = KeyPairGenerator.getInstance("RSA");
-                g.initialize(new RSAKeyGenParameterSpec(2048, BigInteger.valueOf(65537)));
-                yield g;
-            }
-            default -> {
-                KeyPairGenerator g = KeyPairGenerator.getInstance("EC");
-                g.initialize(new ECGenParameterSpec("secp256r1"));
-                yield g;
-            }
-        };
+        // TODO A-1: Instancia el KeyPairGenerator según el algoritmo normalizado.
+        // - Ed25519 → no necesita parámetros adicionales
+        // - RSA     → tamaño 2048 bits, exponente público 65537
+        // - ECDSA   → curva secp256r1
+        KeyPairGenerator kpg = null;
 
-        String keyId = UUID.randomUUID().toString();
-        keyStore.put(keyId, new KeyPairEntry(kpg.generateKeyPair(), norm));
+        // TODO A-2: Genera un identificador único y almacena el par en el keyStore.
+        String keyId = null;
+
         log.info("[KEY-GEN] Par de claves generado → keyId: {}, algoritmo: {}", keyId, norm);
         return keyId;
     }
@@ -66,20 +54,22 @@ public class SignatureService {
         String norm = normalizeAlgorithm(algorithm);
         log.info("[SIGN] keyId: {}, algoritmo: {}, bytes de texto: {}", keyId, norm, plainText.length);
 
-        byte[] hash = hashSHA256(plainText);
-        String hashHex = HexFormat.of().formatHex(hash);
+        // TODO B-1: Calcula el hash SHA-256 del texto en bytes usando hashSHA256.
+        byte[] hash = null;
+        String hashHex = null;
         log.debug("[SIGN] SHA-256 del texto: {}", hashHex);
 
-        KeyPairEntry entry = getEntry(keyId);
-        String sigAlgo = signatureAlgorithm(norm);
-        log.debug("[SIGN] Usando algoritmo de firma JCA: {}", sigAlgo);
+        // TODO B-2: Recupera el par de claves del almacén, obtiene el nombre JCA
+        // del algoritmo e inicializa Signature con la clave PRIVADA para firmar.
+        KeyPairEntry entry = null;
+        String sigAlgo = null;
+        Signature sig = null;
 
-        Signature sig = Signature.getInstance(sigAlgo);
-        sig.initSign(entry.keyPair().getPrivate());
-        sig.update(hash);
-        byte[] firma = sig.sign();
+        // TODO B-3: Carga el HASH (no el texto plano) en el objeto Signature
+        // y ejecuta la operación de firma. El resultado es byte[] con la firma.
+        byte[] firma = null;
 
-        log.info("[SIGN] Firma generada → {} bytes, keyId: {}", firma.length, keyId);
+        log.info("[SIGN] Firma generada → {} bytes, keyId: {}", firma == null ? 0 : firma.length, keyId);
         return new Object[]{hashHex, firma};
     }
 
@@ -90,17 +80,20 @@ public class SignatureService {
         log.info("[VERIFY] keyId: {}, algoritmo: {}, bytes texto: {}, bytes firma: {}",
                 keyId, norm, plainText.length, firma.length);
 
-        byte[] hash = hashSHA256(plainText);
-        log.debug("[VERIFY] SHA-256 del texto: {}", HexFormat.of().formatHex(hash));
+        // TODO C-1: Recalcula el SHA-256 del texto recibido usando hashSHA256.
+        // Si el texto fue alterado, este hash será diferente y la verificación fallará.
+        byte[] hash = null;
+        log.debug("[VERIFY] SHA-256 del texto: {}", hash == null ? "null" : HexFormat.of().formatHex(hash));
 
-        KeyPairEntry entry = getEntry(keyId);
-        String sigAlgo = signatureAlgorithm(norm);
-        log.debug("[VERIFY] Usando algoritmo de firma JCA: {}", sigAlgo);
+        // TODO C-2: Recupera la entrada del almacén e inicializa Signature con
+        // la clave PÚBLICA para la operación de verificación.
+        KeyPairEntry entry = null;
+        String sigAlgo = null;
+        Signature sig = null;
 
-        Signature sig = Signature.getInstance(sigAlgo);
-        sig.initVerify(entry.keyPair().getPublic());
-        sig.update(hash);
-        boolean valida = sig.verify(firma);
+        // TODO C-3: Carga el hash recalculado y verifica contra la firma recibida.
+        // sig.verify devuelve true si la firma es matemáticamente válida.
+        boolean valida = false;
 
         log.info("[VERIFY] Resultado: {} → keyId: {}", valida ? "VÁLIDA" : "INVÁLIDA", keyId);
         return valida;
@@ -133,9 +126,9 @@ public class SignatureService {
     private String normalizeAlgorithm(String algorithm) {
         if (algorithm == null) throw new IllegalArgumentException("El algoritmo no puede ser nulo");
         return switch (algorithm.toUpperCase()) {
-            case "ED25519"       -> ED25519;
-            case "ECDSA", "EC"   -> ECDSA;
-            case "RSA"           -> RSA;
+            case "ED25519" -> ED25519;
+            case "ECDSA", "EC" -> ECDSA;
+            case "RSA" -> RSA;
             default -> throw new IllegalArgumentException(
                     "Algoritmo no soportado: " + algorithm + ". Use ECDSA, Ed25519 o RSA");
         };
@@ -144,18 +137,20 @@ public class SignatureService {
     private String signatureAlgorithm(String algorithm) {
         return switch (algorithm) {
             case ED25519 -> "Ed25519";
-            case RSA     -> "SHA256withRSA";
-            default      -> "SHA256withECDSA";
+            case RSA -> "SHA256withRSA";
+            default -> "SHA256withECDSA";
         };
     }
 
-    // ── Hash ──────────────────────────────────────────────────────────────────
-
+    // TODO B-1 (método): Implementa hashSHA256 con MessageDigest.
+    // MessageDigest.getInstance("SHA-256").digest(data) aplica el hash y devuelve byte[].
     private byte[] hashSHA256(byte[] data) throws Exception {
-        return MessageDigest.getInstance("SHA-256").digest(data);
+        // TODO: reemplaza esta línea con la implementación correcta
+        return null;
     }
 
     // ── Record interno ────────────────────────────────────────────────────────
 
-    private record KeyPairEntry(KeyPair keyPair, String algorithm) {}
+    private record KeyPairEntry(KeyPair keyPair, String algorithm) {
+    }
 }

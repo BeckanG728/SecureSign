@@ -8,8 +8,6 @@ import es.faustino.securesign.service.SignatureService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.nio.charset.StandardCharsets;
-import java.util.Base64;
 import java.util.Map;
 
 @RestController
@@ -50,18 +48,13 @@ public class SignatureController {
      * Body: { "keyId": "...", "algorithm": "Ed25519|ECDSA|RSA", "data": "texto plano" }
      * Hashea el texto con SHA-256 en el backend, firma el hash y devuelve ambos.
      */
+    // TODO B-4: El campo "data" llega como texto plano (String). Conviértelo a bytes UTF-8.
+    // Llama al servicio que devuelve Object[]{ hashHex, firma[] }.
+    // Decodifica cada elemento y construye la respuesta SignResponse con Base64 de la firma.
     @PostMapping("/sign")
     public ResponseEntity<SignResponse> sign(@RequestBody SignRequest request) throws Exception {
-        byte[] plainText = request.data().getBytes(StandardCharsets.UTF_8);
-        Object[] result = signatureService.sign(request.keyId(), request.algorithm(), plainText);
-        String hashHex = (String) result[0];
-        byte[] firma = (byte[]) result[1];
-        return ResponseEntity.ok(new SignResponse(
-                request.keyId(),
-                request.algorithm(),
-                hashHex,
-                Base64.getEncoder().encodeToString(firma)
-        ));
+        // TODO: implementar
+        return null;
     }
 
     /**
@@ -69,11 +62,11 @@ public class SignatureController {
      * Body: { "keyId": "...", "algorithm": "Ed25519|ECDSA|RSA", "data": "texto plano", "signature": "<base64>" }
      * Recalcula el hash SHA-256 del texto y verifica la firma contra él.
      */
+    // TODO C-4: "data" llega como texto plano; "signature" llega en Base64 y debe decodificarse.
+    // El servicio devuelve un boolean que se incluye directamente en la respuesta.
     @PostMapping("/verify")
     public ResponseEntity<Map<String, Object>> verify(@RequestBody VerifyRequest request) throws Exception {
-        byte[] plainText = request.data().getBytes(StandardCharsets.UTF_8);
-        byte[] firma = Base64.getDecoder().decode(request.signature());
-        boolean valida = signatureService.verify(request.keyId(), request.algorithm(), plainText, firma);
-        return ResponseEntity.ok(Map.of("valid", valida));
+        // TODO: implementar
+        return null;
     }
 }
